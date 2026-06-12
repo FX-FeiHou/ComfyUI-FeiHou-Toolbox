@@ -4,14 +4,14 @@
   <a href="README_CN.md">🇨🇳 中文说明 (Chinese)</a>
 </p>
 
-A powerful, high-performance custom node toolbox for ComfyUI, designed to optimize workflow logic, enhance data processing, and provide cinematic visual control utilities.
+A custom node toolbox for ComfyUI. 
 
 ---
 
 ## 🌟 Key Features
-* **Advanced Workflow Optimization:** Seamlessly stream and manage complex logic flows.
-* **Cinematic Visual Utilities:** Tailored for high-fidelity rendering pipelines, precise color matching, and texture preservation.
-* **High-Performance Execution:** Optimized backend processing with minimal VRAM overhead and clean memory management.
+* **Multi-Ref Scail2 Optimization:** Tailored specifically to solve data routing and composition challenges in multi-image reference Scail2 workflows.
+* **Streamlined Data Pipelines:** Enhances interface connectivity to handle multi-source tracking and mask assets with ease.
+* **Extensible Architecture:** Built as a scalable toolbox, ready to welcome diverse feature modules in upcoming releases.
 
 ## ⚙️ Installation
 
@@ -28,10 +28,17 @@ Navigate to your ComfyUI `custom_nodes` directory and run:
 Restart ComfyUI and refresh your browser page (Ctrl + F5).
 
 ## 🛠️ Nodes Overview
-* **[Node Name 1]** - Briefly describe what this node does (e.g., handles complex queue routing).
-* **[Node Name 2]** - Briefly describe what this node does (e.g., extracts fine texture/lighting micro-details).
+
+### 1. Create SCAIL-2 Colored Mask V2
+Modified from the official `Create SCAIL-2 Colored Mask` node to significantly enhance usability in multi-image reference scenarios.
+* **New Interfaces:** Added `prefix_track_data` input and `prefix_image_mask` output ports to facilitate seamless mask data routing.
+* **Execution Boost:** Optimizes the underlying drawing logic by utilizing the GPU preferentially to accelerate mask generation.
+
+### 2. AutoRefCollage
+An automated multi-reference image collaging utility designed for multi-person character masking.
+* **Core Function:** Automatically stitches 4 separate input reference images into a single consolidated image grid.
+* **Scail2 Synergy:** Perfect for setting up and generating multi-person masks efficiently within a single canvas area.
 
 ## 📅 Changelog
 * **v1.0.0**
-  * Initial repository release with core toolbox functionalities.
-  * Optimized backend execution path for high-load workflows.
+  * Repository launched with Scail2 multi-ref optimized nodes: `Create SCAIL-2 Colored Mask V2` and `AutoRefCollage`.
