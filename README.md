@@ -40,5 +40,10 @@ An automated multi-reference image collaging utility designed for multi-person c
 * **Scail2 Synergy:** Perfect for setting up and generating multi-person masks efficiently within a single canvas area.
 
 ## 📅 Changelog
+* **v1.1.0**
+  * **Optimized AutoRefCollage Layout Logic:** Rewrote the stitching and layout algorithm for 1 to 5 people across various aspect ratios.
+  * **Expanded Image Inputs:** Added a 5th image input interface, now supporting up to 5 reference images simultaneously.
+  * **Robust Error Handling:** Missing or unconnected image inputs will no longer trigger errors; the node will gracefully output empty masks instead.
+
 * **v1.0.0**
   * Repository launched with Scail2 multi-ref optimized nodes: `Create SCAIL-2 Colored Mask V2` and `AutoRefCollage`.
