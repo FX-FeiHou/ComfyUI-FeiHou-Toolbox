@@ -52,8 +52,12 @@ DEFAULT_PALETTE = [
 def _first_batch_frame(image):
     if image is None:
         return None
-    if image.ndim != 4 or image.shape[0] < 1:
-        raise ValueError("AutoRefCollage: image inputs must be ComfyUI IMAGE tensors shaped [B, H, W, C].")
+    if not isinstance(image, torch.Tensor):
+        return None
+    if image.ndim != 4:
+        return None
+    if image.shape[0] < 1 or image.shape[1] < 1 or image.shape[2] < 1 or image.shape[3] < 3:
+        return None
     return image[:1, ..., :3]
 
 
@@ -252,44 +256,302 @@ def _prepare_cutout(image, alpha):
 
 def _aspect_mode(width, height):
     ratio = width / max(1, height)
-    if ratio < 0.85:
+    if ratio < 0.88:
         return "portrait"
-    if ratio > 1.15:
+    if ratio > 1.12:
         return "landscape"
     return "square"
 
 
+def _aspect_band(width, height):
+    ratio = width / max(1, height)
+    if ratio <= 0.52:
+        return "portrait_ultra"  # 1:2, 9:19.5, similarly narrow tall canvases.
+    if ratio <= 0.68:
+        return "portrait_tall"  # 9:16, 2:3.
+    if ratio < 0.88:
+        return "portrait_medium"  # 3:4, 4:5.
+    if ratio <= 1.12:
+        return "square"
+    if ratio <= 1.48:
+        return "landscape_medium"  # 4:3.
+    if ratio <= 1.90:
+        return "landscape_wide"  # 3:2, 16:9.
+    return "landscape_ultra"  # 2:1, 21:9 and wider.
+
+
+def _layout_ratio_key(width, height):
+    ratio = width / max(1, height)
+    ratio_map = {
+        "1_2": 1.0 / 2.0,
+        "9_16": 9.0 / 16.0,
+        "2_3": 2.0 / 3.0,
+        "3_4": 3.0 / 4.0,
+        "1_1": 1.0,
+        "4_3": 4.0 / 3.0,
+        "3_2": 3.0 / 2.0,
+        "16_9": 16.0 / 9.0,
+        "2_1": 2.0,
+    }
+    return min(ratio_map, key=lambda key: abs(ratio - ratio_map[key]))
+
+
+def _layout_spec(x, base, max_h, max_w, z):
+    return {"x": x, "base": base, "max_h": max_h, "max_w": max_w, "z": z}
+
+
+def _evenly_spaced(start, end, count):
+    if count <= 1:
+        return [0.5]
+    step = (end - start) / (count - 1)
+    return [start + step * i for i in range(count)]
+
+
+def _row_specs(count, start, end, max_h, max_w, base=0.99):
+    return [_layout_spec(x, base, max_h, max_w, i) for i, x in enumerate(_evenly_spaced(start, end, count))]
+
+
+def _scale_spec_widths(specs, factor):
+    if factor == 1.0:
+        return specs
+    return [
+        {
+            **spec,
+            "max_w": spec["max_w"] * factor,
+        }
+        for spec in specs
+    ]
+
+
+def _make_layout(specs):
+    return [
+        _layout_spec(
+            item["x"],
+            item.get("base", 0.99),
+            item["max_h"],
+            item["max_w"],
+            item.get("z", index),
+        )
+        for index, item in enumerate(specs)
+    ]
+
+
 def _layout_specs(count, width, height):
     mode = _aspect_mode(width, height)
-    if mode == "portrait":
-        if count == 2:
-            return mode, [
-                {"x": 0.33, "base": 0.99, "max_h": 0.80, "max_w": 0.50},
-                {"x": 0.67, "base": 0.92, "max_h": 0.76, "max_w": 0.50},
-            ]
-        if count == 3:
-            return mode, [
-                {"x": 0.33, "base": 0.98, "max_h": 0.74, "max_w": 0.48},
-                {"x": 0.67, "base": 0.84, "max_h": 0.70, "max_w": 0.48},
-                {"x": 0.50, "base": 1.02, "max_h": 0.82, "max_w": 0.56},
-            ]
-        return mode, [
-            {"x": 0.20, "base": 0.74, "max_h": 0.72, "max_w": 0.54},
-            {"x": 0.67, "base": 0.73, "max_h": 0.72, "max_w": 0.54},
-            {"x": 0.36, "base": 1.02, "max_h": 0.76, "max_w": 0.54},
-            {"x": 0.86, "base": 1.02, "max_h": 0.74, "max_w": 0.50},
-        ][:count]
-    if mode == "square":
-        left = 0.11 if count == 4 else 0.16
-        right = 1.0 - left
-        xs = [0.5] if count == 1 else [left + (right - left) * i / (count - 1) for i in range(count)]
-        max_w = min(0.35, 1.08 / count)
-        return mode, [{"x": x, "base": 0.985, "max_h": 0.98, "max_w": max_w} for x in xs]
-    left = 0.13 if count == 4 else 0.17
-    right = 1.0 - left
-    xs = [0.5] if count == 1 else [left + (right - left) * i / (count - 1) for i in range(count)]
-    max_w = min(0.25, 0.92 / count)
-    return mode, [{"x": x, "base": 0.995, "max_h": 0.99, "max_w": max_w} for x in xs]
+    band = _aspect_band(width, height)
+    ratio_key = _layout_ratio_key(width, height)
+
+    if count <= 0:
+        return mode, []
+
+    if count == 1:
+        if band in ("landscape_wide", "landscape_ultra"):
+            return mode, _make_layout([{"x": 0.5, "max_h": 0.98, "max_w": 0.19}])
+        if band == "landscape_medium":
+            return mode, _make_layout([{"x": 0.5, "max_h": 0.98, "max_w": 0.25}])
+        if band == "square":
+            return mode, _make_layout([{"x": 0.5, "max_h": 0.98, "max_w": 0.33}])
+        if band == "portrait_medium":
+            return mode, _make_layout([{"x": 0.5, "max_h": 0.98, "max_w": 0.40}])
+        return mode, _make_layout([{"x": 0.5, "max_h": 0.98, "max_w": 0.46}])
+
+    exact_ratio_templates = {
+        "1_2": {
+            2: [
+                {"x": 0.255, "base": 0.905, "max_h": 0.845, "max_w": 0.49},
+                {"x": 0.745, "base": 0.905, "max_h": 0.845, "max_w": 0.49},
+            ],
+            3: [
+                {"x": 0.21, "base": 0.99, "max_h": 0.62, "max_w": 0.31, "z": 1},
+                {"x": 0.50, "base": 0.59, "max_h": 0.59, "max_w": 0.34, "z": 0},
+                {"x": 0.79, "base": 0.99, "max_h": 0.62, "max_w": 0.31, "z": 2},
+            ],
+            4: [
+                {"x": 0.18, "base": 0.99, "max_h": 0.58, "max_w": 0.27, "z": 2},
+                {"x": 0.40, "base": 0.60, "max_h": 0.58, "max_w": 0.31, "z": 0},
+                {"x": 0.58, "base": 0.99, "max_h": 0.58, "max_w": 0.27, "z": 3},
+                {"x": 0.82, "base": 0.60, "max_h": 0.58, "max_w": 0.31, "z": 1},
+            ],
+            5: [
+                {"x": 0.16, "base": 0.99, "max_h": 0.57, "max_w": 0.24, "z": 2},
+                {"x": 0.34, "base": 0.60, "max_h": 0.58, "max_w": 0.28, "z": 0},
+                {"x": 0.50, "base": 0.99, "max_h": 0.57, "max_w": 0.24, "z": 3},
+                {"x": 0.66, "base": 0.60, "max_h": 0.58, "max_w": 0.28, "z": 1},
+                {"x": 0.84, "base": 0.99, "max_h": 0.57, "max_w": 0.24, "z": 4},
+            ],
+        },
+        "9_16": {
+            2: [
+                {"x": 0.255, "base": 0.985, "max_h": 0.934, "max_w": 0.49},
+                {"x": 0.745, "base": 0.985, "max_h": 0.934, "max_w": 0.49},
+            ],
+            3: [
+                {"x": 0.22, "base": 0.99, "max_h": 0.64, "max_w": 0.33, "z": 1},
+                {"x": 0.50, "base": 0.60, "max_h": 0.60, "max_w": 0.37, "z": 0},
+                {"x": 0.78, "base": 0.99, "max_h": 0.64, "max_w": 0.33, "z": 2},
+            ],
+            4: [
+                {"x": 0.16, "base": 0.99, "max_h": 0.61, "max_w": 0.30, "z": 2},
+                {"x": 0.39, "base": 0.62, "max_h": 0.61, "max_w": 0.34, "z": 0},
+                {"x": 0.61, "base": 0.99, "max_h": 0.61, "max_w": 0.30, "z": 3},
+                {"x": 0.84, "base": 0.62, "max_h": 0.61, "max_w": 0.34, "z": 1},
+            ],
+            5: [
+                {"x": 0.15, "base": 0.99, "max_h": 0.61, "max_w": 0.27, "z": 2},
+                {"x": 0.37, "base": 0.62, "max_h": 0.61, "max_w": 0.32, "z": 0},
+                {"x": 0.50, "base": 0.99, "max_h": 0.61, "max_w": 0.27, "z": 3},
+                {"x": 0.73, "base": 0.62, "max_h": 0.61, "max_w": 0.32, "z": 1},
+                {"x": 0.85, "base": 0.99, "max_h": 0.61, "max_w": 0.27, "z": 4},
+            ],
+        },
+        "2_3": {
+            2: [
+                {"x": 0.255, "base": 0.988, "max_h": 0.98, "max_w": 0.43},
+                {"x": 0.745, "base": 0.988, "max_h": 0.98, "max_w": 0.43},
+            ],
+            3: [
+                {"x": 0.20, "base": 0.99, "max_h": 0.67, "max_w": 0.31, "z": 1},
+                {"x": 0.50, "base": 0.70, "max_h": 0.70, "max_w": 0.36, "z": 0},
+                {"x": 0.80, "base": 0.99, "max_h": 0.67, "max_w": 0.31, "z": 2},
+            ],
+            4: [
+                {"x": 0.15, "base": 0.99, "max_h": 0.65, "max_w": 0.28, "z": 2},
+                {"x": 0.39, "base": 0.66, "max_h": 0.66, "max_w": 0.33, "z": 0},
+                {"x": 0.61, "base": 0.99, "max_h": 0.65, "max_w": 0.28, "z": 3},
+                {"x": 0.85, "base": 0.66, "max_h": 0.66, "max_w": 0.33, "z": 1},
+            ],
+            5: [
+                {"x": 0.16, "base": 0.99, "max_h": 0.70, "max_w": 0.27, "z": 2},
+                {"x": 0.34, "base": 0.67, "max_h": 0.67, "max_w": 0.33, "z": 0},
+                {"x": 0.50, "base": 0.99, "max_h": 0.70, "max_w": 0.27, "z": 3},
+                {"x": 0.66, "base": 0.67, "max_h": 0.67, "max_w": 0.33, "z": 1},
+                {"x": 0.84, "base": 0.99, "max_h": 0.70, "max_w": 0.27, "z": 4},
+            ],
+        },
+        "4_3": {
+            3: [
+                {"x": 0.20, "base": 0.99, "max_h": 0.82, "max_w": 0.35, "z": 1},
+                {"x": 0.50, "base": 0.82, "max_h": 0.82, "max_w": 0.39, "z": 0},
+                {"x": 0.80, "base": 0.99, "max_h": 0.82, "max_w": 0.35, "z": 2},
+            ],
+            4: [
+                {"x": 0.16, "base": 0.99, "max_h": 0.71, "max_w": 0.31, "z": 2},
+                {"x": 0.39, "base": 0.78, "max_h": 0.78, "max_w": 0.34, "z": 0},
+                {"x": 0.56, "base": 0.99, "max_h": 0.71, "max_w": 0.31, "z": 3},
+                {"x": 0.80, "base": 0.78, "max_h": 0.78, "max_w": 0.34, "z": 1},
+            ],
+            5: [
+                {"x": 0.14, "base": 0.99, "max_h": 0.69, "max_w": 0.28, "z": 2},
+                {"x": 0.37, "base": 0.78, "max_h": 0.78, "max_w": 0.32, "z": 0},
+                {"x": 0.50, "base": 0.99, "max_h": 0.69, "max_w": 0.28, "z": 3},
+                {"x": 0.73, "base": 0.78, "max_h": 0.78, "max_w": 0.32, "z": 1},
+                {"x": 0.86, "base": 0.99, "max_h": 0.69, "max_w": 0.28, "z": 4},
+            ],
+        },
+        "1_1": {
+            4: [
+                {"x": 0.15, "base": 0.915, "max_h": 0.83, "max_w": 0.28},
+                {"x": 0.38, "base": 0.915, "max_h": 0.83, "max_w": 0.28},
+                {"x": 0.62, "base": 0.915, "max_h": 0.83, "max_w": 0.28},
+                {"x": 0.85, "base": 0.915, "max_h": 0.83, "max_w": 0.28},
+            ],
+            5: [
+                {"x": 0.14, "base": 0.857, "max_h": 0.69, "max_w": 0.22},
+                {"x": 0.32, "base": 0.857, "max_h": 0.69, "max_w": 0.22},
+                {"x": 0.50, "base": 0.857, "max_h": 0.69, "max_w": 0.22},
+                {"x": 0.68, "base": 0.857, "max_h": 0.69, "max_w": 0.22},
+                {"x": 0.86, "base": 0.857, "max_h": 0.69, "max_w": 0.22},
+            ],
+        },
+    }
+    if ratio_key in exact_ratio_templates and count in exact_ratio_templates[ratio_key]:
+        return mode, _make_layout(exact_ratio_templates[ratio_key][count])
+
+    landscape_templates = {
+        2: {
+            "landscape_medium": [{"x": 0.31, "max_h": 0.98, "max_w": 0.22}, {"x": 0.69, "max_h": 0.98, "max_w": 0.22}],
+            "landscape_wide": [{"x": 0.35, "max_h": 0.98, "max_w": 0.16}, {"x": 0.65, "max_h": 0.98, "max_w": 0.16}],
+            "landscape_ultra": [{"x": 0.35, "max_h": 0.98, "max_w": 0.145}, {"x": 0.65, "max_h": 0.98, "max_w": 0.145}],
+        },
+        3: {
+            "landscape_medium": [{"x": 0.22, "max_h": 0.98, "max_w": 0.22}, {"x": 0.50, "max_h": 0.98, "max_w": 0.22}, {"x": 0.78, "max_h": 0.98, "max_w": 0.22}],
+            "landscape_wide": [{"x": 0.21, "max_h": 0.98, "max_w": 0.16}, {"x": 0.50, "max_h": 0.98, "max_w": 0.16}, {"x": 0.79, "max_h": 0.98, "max_w": 0.16}],
+            "landscape_ultra": [{"x": 0.27, "max_h": 0.98, "max_w": 0.145}, {"x": 0.50, "max_h": 0.98, "max_w": 0.145}, {"x": 0.73, "max_h": 0.98, "max_w": 0.145}],
+        },
+        4: {
+            "landscape_medium": [{"x": 0.13, "max_h": 0.98, "max_w": 0.22}, {"x": 0.38, "max_h": 0.98, "max_w": 0.22}, {"x": 0.62, "max_h": 0.98, "max_w": 0.22}, {"x": 0.87, "max_h": 0.98, "max_w": 0.22}],
+            "landscape_wide": [{"x": 0.14, "max_h": 0.98, "max_w": 0.16}, {"x": 0.38, "max_h": 0.98, "max_w": 0.16}, {"x": 0.62, "max_h": 0.98, "max_w": 0.16}, {"x": 0.86, "max_h": 0.98, "max_w": 0.16}],
+            "landscape_ultra": [{"x": 0.15, "max_h": 0.98, "max_w": 0.145}, {"x": 0.38, "max_h": 0.98, "max_w": 0.145}, {"x": 0.62, "max_h": 0.98, "max_w": 0.145}, {"x": 0.85, "max_h": 0.98, "max_w": 0.145}],
+        },
+        5: {
+            "landscape_medium": [{"x": 0.11, "max_h": 0.98, "max_w": 0.22}, {"x": 0.31, "max_h": 0.98, "max_w": 0.22}, {"x": 0.50, "max_h": 0.98, "max_w": 0.22}, {"x": 0.69, "max_h": 0.98, "max_w": 0.22}, {"x": 0.89, "max_h": 0.98, "max_w": 0.22}],
+            "landscape_wide": [{"x": 0.14, "max_h": 0.98, "max_w": 0.16}, {"x": 0.32, "max_h": 0.98, "max_w": 0.16}, {"x": 0.50, "max_h": 0.98, "max_w": 0.16}, {"x": 0.68, "max_h": 0.98, "max_w": 0.16}, {"x": 0.86, "max_h": 0.98, "max_w": 0.16}],
+            "landscape_ultra": [{"x": 0.12, "max_h": 0.98, "max_w": 0.145}, {"x": 0.31, "max_h": 0.98, "max_w": 0.145}, {"x": 0.50, "max_h": 0.98, "max_w": 0.145}, {"x": 0.69, "max_h": 0.98, "max_w": 0.145}, {"x": 0.88, "max_h": 0.98, "max_w": 0.145}],
+        },
+    }
+
+    square_templates = {
+        2: [{"x": 0.31, "max_h": 0.98, "max_w": 0.29}, {"x": 0.69, "max_h": 0.98, "max_w": 0.29}],
+        3: [{"x": 0.19, "max_h": 0.98, "max_w": 0.29}, {"x": 0.50, "max_h": 0.98, "max_w": 0.29}, {"x": 0.81, "max_h": 0.98, "max_w": 0.29}],
+        4: [{"x": 0.145, "base": 0.915, "max_h": 0.83, "max_w": 0.24}, {"x": 0.382, "base": 0.915, "max_h": 0.83, "max_w": 0.24}, {"x": 0.618, "base": 0.915, "max_h": 0.83, "max_w": 0.24}, {"x": 0.855, "base": 0.915, "max_h": 0.83, "max_w": 0.24}],
+        5: [{"x": 0.14, "base": 0.857, "max_h": 0.69, "max_w": 0.19}, {"x": 0.32, "base": 0.857, "max_h": 0.69, "max_w": 0.19}, {"x": 0.50, "base": 0.857, "max_h": 0.69, "max_w": 0.19}, {"x": 0.68, "base": 0.857, "max_h": 0.69, "max_w": 0.19}, {"x": 0.86, "base": 0.857, "max_h": 0.69, "max_w": 0.19}],
+    }
+
+    portrait_medium_templates = {
+        2: [{"x": 0.255, "max_h": 0.98, "max_w": 0.43}, {"x": 0.745, "max_h": 0.98, "max_w": 0.43}],
+        3: [{"x": 0.19, "max_h": 0.98, "max_w": 0.39}, {"x": 0.50, "max_h": 0.98, "max_w": 0.39}, {"x": 0.81, "max_h": 0.98, "max_w": 0.39}],
+        4: [{"x": 0.145, "max_h": 0.98, "max_w": 0.29}, {"x": 0.38, "max_h": 0.98, "max_w": 0.29}, {"x": 0.62, "max_h": 0.98, "max_w": 0.29}, {"x": 0.855, "max_h": 0.98, "max_w": 0.29}],
+        5: [{"x": 0.11, "max_h": 0.98, "max_w": 0.29}, {"x": 0.305, "max_h": 0.98, "max_w": 0.29}, {"x": 0.50, "max_h": 0.98, "max_w": 0.29}, {"x": 0.695, "max_h": 0.98, "max_w": 0.29}, {"x": 0.89, "max_h": 0.98, "max_w": 0.29}],
+    }
+
+    portrait_tall_templates = {
+        2: [{"x": 0.255, "max_h": 0.98, "max_w": 0.43}, {"x": 0.745, "max_h": 0.98, "max_w": 0.43}],
+        3: [
+            {"x": 0.21, "max_h": 0.82, "max_w": 0.36, "z": 1},
+            {"x": 0.50, "max_h": 0.98, "max_w": 0.44, "base": 0.86, "z": 0},
+            {"x": 0.79, "max_h": 0.82, "max_w": 0.36, "z": 2},
+        ],
+        4: [
+            {"x": 0.145, "max_h": 0.65, "max_w": 0.29, "z": 2},
+            {"x": 0.38, "max_h": 0.65, "max_w": 0.29, "base": 0.66, "z": 0},
+            {"x": 0.62, "max_h": 0.65, "max_w": 0.29, "z": 3},
+            {"x": 0.855, "max_h": 0.65, "max_w": 0.29, "base": 0.66, "z": 1},
+        ],
+        5: [
+            {"x": 0.16, "max_h": 0.70, "max_w": 0.29, "z": 2},
+            {"x": 0.33, "max_h": 0.98, "max_w": 0.36, "base": 0.86, "z": 0},
+            {"x": 0.50, "max_h": 0.70, "max_w": 0.29, "z": 3},
+            {"x": 0.67, "max_h": 0.98, "max_w": 0.36, "base": 0.86, "z": 1},
+            {"x": 0.84, "max_h": 0.70, "max_w": 0.29, "z": 4},
+        ],
+    }
+
+    portrait_ultra_templates = {
+        2: [{"x": 0.255, "max_h": 0.85, "max_w": 0.49}, {"x": 0.745, "max_h": 0.85, "max_w": 0.49}],
+        3: [
+            {"x": 0.21, "max_h": 0.58, "max_w": 0.36, "z": 1},
+            {"x": 0.50, "max_h": 0.85, "max_w": 0.49, "base": 0.72, "z": 0},
+            {"x": 0.79, "max_h": 0.58, "max_w": 0.36, "z": 2},
+        ],
+        4: [
+            {"x": 0.275, "max_h": 0.98, "max_w": 0.55, "z": 1},
+            {"x": 0.705, "max_h": 0.98, "max_w": 0.58, "z": 0},
+        ],
+        5: [
+            {"x": 0.255, "max_h": 0.98, "max_w": 0.50, "z": 1},
+            {"x": 0.745, "max_h": 0.98, "max_w": 0.50, "z": 0},
+        ],
+    }
+
+    if band in ("landscape_medium", "landscape_wide", "landscape_ultra"):
+        return mode, _make_layout(landscape_templates[min(count, 5)][band])
+    if band == "square":
+        return mode, _make_layout(square_templates[min(count, 5)])
+    if band == "portrait_medium":
+        return mode, _make_layout(portrait_medium_templates[min(count, 5)])
+    if band == "portrait_tall":
+        return mode, _make_layout(portrait_tall_templates[min(count, 5)])
+    return mode, _make_layout(portrait_ultra_templates[min(count, 5)])
 
 
 def _paste_cutout(canvas, canvas_alpha, cutout, spec, out_width, out_height):
@@ -335,15 +597,24 @@ def _compose_collage(cutouts, width, height, background):
     canvas = bg.view(1, 1, 3).expand(height, width, 3).clone()
     canvas_alpha = torch.zeros((height, width), device=device, dtype=dtype)
     _, specs = _layout_specs(len(cutouts), width, height)
-    for cutout, spec in zip(cutouts, specs):
+    draw_items = []
+    for index, (cutout, spec) in enumerate(zip(cutouts, specs)):
         local = {
             "rgb": cutout["rgb"].to(device=device, dtype=dtype),
             "alpha": cutout["alpha"].to(device=device, dtype=dtype),
             "width": cutout["width"],
             "height": cutout["height"],
         }
+        draw_items.append((spec.get("z", index), index, local, spec))
+    for _, _, local, spec in sorted(draw_items):
         _paste_cutout(canvas, canvas_alpha, local, spec, width, height)
     return canvas.unsqueeze(0).clamp(0, 1), canvas_alpha.unsqueeze(0).clamp(0, 1)
+
+
+def _blank_collage_output(width, height, background):
+    collage = _blank_images(1, height, width, background)
+    alpha_mask = torch.zeros((1, height, width), device=collage.device, dtype=collage.dtype)
+    return collage, alpha_mask
 
 def _unpack(track_data):
     packed = track_data["packed_masks"]
@@ -622,7 +893,7 @@ class SCAIL2ColoredMaskV2(io.ComfyNode):
 
 
 class AutoRefCollage(io.ComfyNode):
-    """Extract 2-4 reference people with SAM3 and compose an automatic collage."""
+    """Extract up to 5 reference people with SAM3 and compose an automatic collage."""
 
     @classmethod
     def define_schema(cls):
@@ -642,10 +913,11 @@ class AutoRefCollage(io.ComfyNode):
                     display_name="clip",
                     tooltip="SAM3/SAM3.1 CLIP from CheckpointLoaderSimple. The node encodes its internal prompt with this input.",
                 ),
-                io.Image.Input("image_1", display_name="image_1"),
-                io.Image.Input("image_2", display_name="image_2"),
+                io.Image.Input("image_1", display_name="image_1", optional=True),
+                io.Image.Input("image_2", display_name="image_2", optional=True),
                 io.Image.Input("image_3", display_name="image_3", optional=True),
                 io.Image.Input("image_4", display_name="image_4", optional=True),
+                io.Image.Input("image_5", display_name="image_5", optional=True),
                 io.String.Input(
                     "prompt",
                     display_name="prompt",
@@ -700,15 +972,16 @@ class AutoRefCollage(io.ComfyNode):
         cls,
         model,
         clip,
-        image_1,
-        image_2,
-        prompt,
-        width,
-        height,
-        detection_threshold,
-        background,
+        image_1=None,
+        image_2=None,
+        prompt="person",
+        width=1280,
+        height=1280,
+        detection_threshold=0.5,
+        background="white",
         image_3=None,
         image_4=None,
+        image_5=None,
     ) -> io.NodeOutput:
         images = [
             img
@@ -717,11 +990,13 @@ class AutoRefCollage(io.ComfyNode):
                 _first_batch_frame(image_2),
                 _first_batch_frame(image_3),
                 _first_batch_frame(image_4),
+                _first_batch_frame(image_5),
             )
             if img is not None
         ]
-        if len(images) < 2:
-            raise ValueError("AutoRefCollage / 多参图像自动拼接: at least 2 image inputs are required.")
+        if not images:
+            collage, alpha_mask = _blank_collage_output(int(width), int(height), background)
+            return io.NodeOutput(collage, alpha_mask)
 
         threshold = max(0.0, min(float(detection_threshold), 1.0))
         conditioning = _encode_sam3_prompt(clip, prompt)
