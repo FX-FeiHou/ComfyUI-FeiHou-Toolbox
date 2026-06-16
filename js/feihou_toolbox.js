@@ -340,7 +340,7 @@ function makeDefaultItems(count, width, height) {
   }));
 }
 
-function parseLayout(layoutJson, count, width, height, background) {
+function parseLayout(layoutJson, count, width, height, background, options = {}) {
   let layout = {};
   if (typeof layoutJson === "string" && layoutJson.trim()) {
     try {
@@ -350,8 +350,10 @@ function parseLayout(layoutJson, count, width, height, background) {
       layout = {};
     }
   }
-  const outWidth = clamp(Math.round(num(layout.width, width)), 64, 8192);
-  const outHeight = clamp(Math.round(num(layout.height, height)), 64, 8192);
+  const useLayoutWidth = options.useLayoutWidth ?? options.useLayoutSize ?? true;
+  const useLayoutHeight = options.useLayoutHeight ?? options.useLayoutSize ?? true;
+  const outWidth = clamp(Math.round(num(useLayoutWidth ? layout.width : undefined, width)), 64, 8192);
+  const outHeight = clamp(Math.round(num(useLayoutHeight ? layout.height : undefined, height)), 64, 8192);
   const outBg = String(layout.background || background || DEFAULT_BG).toLowerCase() === "white" ? "white" : "black";
   const defaults = makeDefaultItems(count, outWidth, outHeight);
   const rawItems = Array.isArray(layout.items) ? layout.items : [];
@@ -437,6 +439,215 @@ function getLinkedMediaName(node, inputName, visited = new Set()) {
   return "";
 }
 
+function numericFromValue(value, preferredNames = []) {
+  if (value == null || typeof value === "boolean") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = numericFromValue(item, preferredNames);
+      if (found != null) return found;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    for (const name of preferredNames) {
+      if (Object.prototype.hasOwnProperty.call(value, name)) {
+        const found = numericFromValue(value[name], preferredNames);
+        if (found != null) return found;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(value, "value")) {
+      const found = numericFromValue(value.value, preferredNames);
+      if (found != null) return found;
+    }
+    for (const item of Object.values(value)) {
+      const found = numericFromValue(item, preferredNames);
+      if (found != null) return found;
+    }
+  }
+  return null;
+}
+
+function numericNamesForInput(inputName) {
+  if (inputName === "width") return ["width", "w", "value", "number", "int", "integer", "宽度", "宽"];
+  if (inputName === "height") return ["height", "h", "value", "number", "int", "integer", "高度", "高"];
+  return ["value", inputName, "number", "int", "integer"];
+}
+
+function getGraphNodes() {
+  const graph = app.graph;
+  if (!graph) return [];
+  if (Array.isArray(graph._nodes)) return graph._nodes;
+  if (Array.isArray(graph.nodes)) return graph.nodes;
+  return [];
+}
+
+function normalizedVariableKey(value) {
+  if (value == null) return "";
+  return String(value)
+    .trim()
+    .replace(/^(get|set|获取|读取|设置|写入)[\s_:\-：]*/i, "")
+    .replace(/[\s_:\-：]+/g, "")
+    .toLowerCase();
+}
+
+function pushVariableKey(keys, value) {
+  const key = normalizedVariableKey(value);
+  if (key && !keys.includes(key)) keys.push(key);
+}
+
+function variableModeMatches(value, mode) {
+  if (!mode) return true;
+  const normalized = String(value || "").toLowerCase();
+  if (mode === "get") return ["get", "获取", "读取"].includes(normalized);
+  if (mode === "set") return ["set", "设置", "写入"].includes(normalized);
+  return normalized === mode;
+}
+
+function collectVariableKeysFromNode(node, mode = "") {
+  const keys = [];
+  const namedFields = new Set([
+    "key",
+    "name",
+    "variable",
+    "variable_name",
+    "var_name",
+    "id",
+    "label",
+    "text",
+    "string",
+    "value",
+    "变量",
+    "变量名",
+    "名称",
+    "名字",
+  ]);
+  const titles = [node?.title, node?.type, node?.comfyClass, node?.constructor?.type];
+  for (const value of titles) {
+    if (typeof value !== "string") continue;
+    const match =
+      value.match(/(?:^|[\s_:\-：])(get|set)[\s_:\-：]+(.+)$/i) ||
+      value.match(/(?:^|[\s_:\-：])(获取|读取|设置|写入)[\s_:\-：]*(.+)$/i);
+    if (match && variableModeMatches(match[1], mode)) {
+      pushVariableKey(keys, match[2]);
+    }
+  }
+  for (const widget of node?.widgets || []) {
+    const name = String(widget?.name || "").toLowerCase();
+    if (namedFields.has(name)) {
+      pushVariableKey(keys, widget?.value ?? widget?.inputEl?.value);
+    }
+  }
+  for (const [name, value] of Object.entries(node?.properties || {})) {
+    if (namedFields.has(String(name).toLowerCase())) {
+      pushVariableKey(keys, value);
+    }
+  }
+  return keys;
+}
+
+function nodeLooksLikeVariableNode(node, mode) {
+  const marker = mode === "set" ? /(^|[\s_:\-：])(set|设置|写入)([\s_:\-：]|$)/i : /(^|[\s_:\-：])(get|获取|读取)([\s_:\-：]|$)/i;
+  return [node?.title, node?.type, node?.comfyClass, node?.constructor?.type]
+    .some((value) => typeof value === "string" && marker.test(value));
+}
+
+function getNodeOwnNumericValue(source, wantedName, preferredOnly = false) {
+  const preferredNames = numericNamesForInput(wantedName);
+  for (const widget of source.widgets || []) {
+    const widgetName = String(widget?.name || "").toLowerCase();
+    if (!preferredNames.includes(widgetName)) continue;
+    const found = numericFromValue(widget?.value ?? widget?.inputEl?.value, preferredNames);
+    if (found != null) return found;
+  }
+  if (preferredOnly) return null;
+  for (const widget of source.widgets || []) {
+    const found = numericFromValue(widget?.value ?? widget?.inputEl?.value, preferredNames);
+    if (found != null) return found;
+  }
+  for (const container of [source.widgets_values, source.properties]) {
+    const found = numericFromValue(container, preferredNames);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+function getLinkedInputNumericValue(source, wantedName, visited = new Set()) {
+  const inputs = [...(source?.inputs || [])].filter((slot) => slot?.name && slot?.link);
+  const preferredNames = numericNamesForInput(wantedName);
+  inputs.sort((a, b) => {
+    const aName = String(a.name || "").toLowerCase();
+    const bName = String(b.name || "").toLowerCase();
+    const aScore = preferredNames.includes(aName) ? 0 : aName === "value" ? 1 : 2;
+    const bScore = preferredNames.includes(bName) ? 0 : bName === "value" ? 1 : 2;
+    return aScore - bScore;
+  });
+  for (const upstream of inputs) {
+    const found = getLinkedNumericValue(source, upstream.name, wantedName, visited);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+function getVariableSetNumericValue(getNode, wantedName, visited = new Set()) {
+  if (!nodeLooksLikeVariableNode(getNode, "get")) return null;
+  const getKeys = collectVariableKeysFromNode(getNode, "get");
+  if (!getKeys.length) return null;
+  for (const candidate of getGraphNodes()) {
+    if (!candidate || candidate === getNode || !isNodeActive(candidate)) continue;
+    if (!nodeLooksLikeVariableNode(candidate, "set")) continue;
+    const setKeys = collectVariableKeysFromNode(candidate, "set");
+    if (!setKeys.some((key) => getKeys.includes(key))) continue;
+    const localVisited = new Set(visited);
+    const candidateId = String(candidate.id ?? "");
+    if (candidateId && localVisited.has(candidateId)) continue;
+    if (candidateId) localVisited.add(candidateId);
+    const linked = getLinkedInputNumericValue(candidate, wantedName, localVisited);
+    if (linked != null) return linked;
+    const own = getNodeOwnNumericValue(candidate, wantedName);
+    if (own != null) return own;
+  }
+  return null;
+}
+
+function getNodeNumericValue(source, wantedName, visited = new Set()) {
+  if (!source || !isNodeActive(source)) return null;
+  const sourceId = String(source.id ?? "");
+  if (sourceId && visited.has(sourceId)) return null;
+  if (sourceId) visited.add(sourceId);
+
+  const ownPreferred = getNodeOwnNumericValue(source, wantedName, true);
+  if (ownPreferred != null) return ownPreferred;
+  const variableValue = getVariableSetNumericValue(source, wantedName, visited);
+  if (variableValue != null) return variableValue;
+  const own = getNodeOwnNumericValue(source, wantedName);
+  if (own != null) return own;
+  for (const upstream of source.inputs || []) {
+    if (!upstream?.name) continue;
+    const found = getLinkedNumericValue(source, upstream.name, wantedName, visited);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+function getLinkedNumericValue(node, inputName, wantedName = inputName, visited = new Set()) {
+  const source = getLinkedSourceNode(node, inputName);
+  if (!source) return null;
+  return getNodeNumericValue(source, wantedName, visited);
+}
+
+function readNumericInputValue(node, inputName, widget, fallback) {
+  if (hasLinkedInput(node, inputName)) {
+    const linked = getLinkedNumericValue(node, inputName);
+    if (linked != null) return clamp(Math.round(linked), 64, 8192);
+  }
+  return clamp(Math.round(num(widget?.value, fallback)), 64, 8192);
+}
+
 function createButton(text, className = "") {
   const button = document.createElement("button");
   button.type = "button";
@@ -496,12 +707,14 @@ function buildManualUI(node) {
     setHiddenWidget(widget);
   }
 
+  const initialWidth = clamp(Math.round(num(widthWidget?.value, DEFAULT_WIDTH)), 64, 8192);
+  const initialHeight = clamp(Math.round(num(heightWidget?.value, DEFAULT_HEIGHT)), 64, 8192);
   const initial = parseLayout(
     layoutWidget?.value || "",
     5,
-    num(widthWidget?.value, DEFAULT_WIDTH),
-    num(heightWidget?.value, DEFAULT_HEIGHT),
-    backgroundWidget?.value || DEFAULT_BG
+    initialWidth,
+    initialHeight,
+    backgroundWidget?.value || DEFAULT_BG,
   );
 
   const state = {
@@ -679,6 +892,33 @@ function buildManualUI(node) {
 
   function syncOpacityWidget() {
     syncWidgetValue(state, opacityWidget, state.backgroundOpacity);
+  }
+
+  function readCurrentSize(fallbackWidth = state.pendingWidth, fallbackHeight = state.pendingHeight) {
+    return {
+      width: readNumericInputValue(node, "width", widthWidget, fallbackWidth),
+      height: readNumericInputValue(node, "height", heightWidget, fallbackHeight),
+    };
+  }
+
+  function applyCurrentSize({ sync = true, render = false, resetItems = false } = {}) {
+    const next = readCurrentSize(state.width, state.height);
+    const changed = next.width !== state.width || next.height !== state.height;
+    state.width = next.width;
+    state.height = next.height;
+    state.pendingWidth = next.width;
+    state.pendingHeight = next.height;
+    if (resetItems) {
+      state.items = makeDefaultItems(5, state.width, state.height);
+    }
+    if (sync) {
+      syncSizeWidgets();
+      syncLayoutJson();
+    }
+    if (render && changed) {
+      renderFull();
+    }
+    return changed;
   }
 
   function attachWidgetHost(widget, host, placeholder = "") {
@@ -1121,12 +1361,7 @@ function buildManualUI(node) {
 
   applyBtn.addEventListener("click", (event) => {
     event.preventDefault();
-    state.pendingWidth = clamp(Math.round(num(widthWidget?.value, state.pendingWidth)), 64, 8192);
-    state.pendingHeight = clamp(Math.round(num(heightWidget?.value, state.pendingHeight)), 64, 8192);
-    state.width = state.pendingWidth;
-    state.height = state.pendingHeight;
-    syncSizeWidgets();
-    syncLayoutJson();
+    applyCurrentSize({ sync: true });
     renderFull();
   });
 
@@ -1160,10 +1395,10 @@ function buildManualUI(node) {
     prompt.value = state.prompt;
   });
   attachWidgetSync(widthWidget, (value) => {
-    state.pendingWidth = clamp(Math.round(num(value, state.width)), 64, 8192);
+    state.pendingWidth = clamp(Math.round(num(value, state.pendingWidth)), 64, 8192);
   });
   attachWidgetSync(heightWidget, (value) => {
-    state.pendingHeight = clamp(Math.round(num(value, state.height)), 64, 8192);
+    state.pendingHeight = clamp(Math.round(num(value, state.pendingHeight)), 64, 8192);
   });
   attachWidgetSync(opacityWidget, (value) => {
     state.backgroundOpacity = clamp(num(value, state.backgroundOpacity), 0, 1);
@@ -1203,6 +1438,10 @@ function buildManualUI(node) {
     renderFull,
     scheduleRender,
     loadImages,
+    refreshDimensions() {
+      state.pendingWidth = clamp(Math.round(num(widthWidget?.value, state.pendingWidth)), 64, 8192);
+      state.pendingHeight = clamp(Math.round(num(heightWidget?.value, state.pendingHeight)), 64, 8192);
+    },
     updateHelpAnchor,
     updateMinNodeSize,
     toggleHelp,
@@ -1275,6 +1514,7 @@ app.registerExtension({
       requestAnimationFrame(() => {
         applyNodeDomHeight(this, this.size);
         this._fhManual?.updateHelpAnchor?.();
+        this._fhManual?.refreshDimensions?.();
         this._fhManual?.renderFull?.();
       });
       return result;
@@ -1295,6 +1535,7 @@ app.registerExtension({
       requestAnimationFrame(() => {
         applyNodeDomHeight(this, this.size);
         this._fhManual?.updateHelpAnchor?.();
+        this._fhManual?.refreshDimensions?.();
         this._fhManual?.renderFull?.();
       });
       return result;
@@ -1327,7 +1568,10 @@ app.registerExtension({
 
     nodeType.prototype.onConnectionsChange = function () {
       const result = onConnectionsChange?.apply(this, arguments);
-      requestAnimationFrame(() => this._fhManual?.renderFull?.());
+      requestAnimationFrame(() => {
+        this._fhManual?.refreshDimensions?.();
+        this._fhManual?.renderFull?.();
+      });
       return result;
     };
 

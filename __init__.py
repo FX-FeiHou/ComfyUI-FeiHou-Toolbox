@@ -24,6 +24,7 @@ import base64
 import json
 import logging
 import os
+import re
 from io import BytesIO
 
 from typing_extensions import override
@@ -337,6 +338,278 @@ def _workflow_input_is_active(extra_pnginfo, unique_id, input_name):
     if origin_id is None:
         return True
     return not _workflow_node_is_inactive(_workflow_node_by_id(workflow, origin_id))
+
+
+def _numeric_from_value(value, preferred_names=()):
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return float(stripped)
+        except ValueError:
+            return None
+    if isinstance(value, dict):
+        for name in preferred_names:
+            if name in value:
+                found = _numeric_from_value(value.get(name), preferred_names)
+                if found is not None:
+                    return found
+        if "value" in value:
+            found = _numeric_from_value(value.get("value"), preferred_names)
+            if found is not None:
+                return found
+        for item in value.values():
+            found = _numeric_from_value(item, preferred_names)
+            if found is not None:
+                return found
+        return None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            found = _numeric_from_value(item, preferred_names)
+            if found is not None:
+                return found
+    return None
+
+
+def _numeric_names_for_input(input_name):
+    if input_name == "width":
+        return ("width", "w", "value", "number", "int", "integer", "宽度", "宽")
+    if input_name == "height":
+        return ("height", "h", "value", "number", "int", "integer", "高度", "高")
+    return ("value", input_name, "number", "int", "integer")
+
+
+def _normalize_variable_key(value):
+    if value is None:
+        return ""
+    text = str(value).strip()
+    for prefix in ("get", "set", "获取", "读取", "设置", "写入"):
+        if text.lower().startswith(prefix):
+            text = text[len(prefix):]
+            break
+    for char in (" ", "\t", "_", "-", ":", "："):
+        text = text.replace(char, "")
+    return text.lower()
+
+
+def _variable_mode_matches(value, mode):
+    if not mode:
+        return True
+    text = str(value or "").lower()
+    if mode == "get":
+        return text in {"get", "获取", "读取"}
+    if mode == "set":
+        return text in {"set", "设置", "写入"}
+    return text == mode
+
+
+def _node_text_fields(node):
+    if not isinstance(node, dict):
+        return ()
+    return (
+        node.get("title"),
+        node.get("type"),
+        node.get("class_type"),
+        node.get("display_name"),
+    )
+
+
+def _workflow_node_looks_like_variable_node(node, mode):
+    if mode == "set":
+        pattern = r"(^|[\s_:\-：])(set|设置|写入)(?=$|[\s_:\-：])"
+    else:
+        pattern = r"(^|[\s_:\-：])(get|获取|读取)(?=$|[\s_:\-：])"
+    for value in _node_text_fields(node):
+        text = str(value or "").lower()
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    return False
+
+
+def _workflow_collect_variable_keys(node, mode=""):
+    keys = []
+    field_names = {
+        "key",
+        "name",
+        "variable",
+        "variable_name",
+        "var_name",
+        "id",
+        "label",
+        "text",
+        "string",
+        "value",
+        "变量",
+        "变量名",
+        "名称",
+        "名字",
+    }
+
+    def add_key(value):
+        key = _normalize_variable_key(value)
+        if key and key not in keys:
+            keys.append(key)
+
+    for value in _node_text_fields(node):
+        text = str(value or "").strip()
+        match = re.search(r"(?:^|[\s_:\-：])(get|set)[\s_:\-：]+(.+)$", text, re.IGNORECASE)
+        if not match:
+            match = re.search(r"(?:^|[\s_:\-：])(获取|读取|设置|写入)[\s_:\-：]*(.+)$", text, re.IGNORECASE)
+        if match and _variable_mode_matches(match.group(1), mode):
+            add_key(match.group(2))
+
+    widgets_values = node.get("widgets_values") if isinstance(node, dict) else None
+    if isinstance(widgets_values, dict):
+        for name, value in widgets_values.items():
+            if str(name).lower() in field_names:
+                add_key(value)
+    properties = node.get("properties") if isinstance(node, dict) else None
+    if isinstance(properties, dict):
+        for name, value in properties.items():
+            if str(name).lower() in field_names:
+                add_key(value)
+    return keys
+
+
+def _workflow_nodes(workflow):
+    nodes = workflow.get("nodes") if isinstance(workflow, dict) else None
+    return nodes if isinstance(nodes, list) else []
+
+
+def _workflow_node_own_numeric_value(node, wanted_name, preferred_only=False):
+    preferred_names = _numeric_names_for_input(wanted_name)
+    inputs = node.get("inputs") if isinstance(node, dict) else None
+    if isinstance(inputs, dict):
+        for name in preferred_names:
+            found = _numeric_from_value(inputs.get(name), preferred_names)
+            if found is not None:
+                return found
+        if preferred_only:
+            return None
+        for value in inputs.values():
+            found = _numeric_from_value(value, preferred_names)
+            if found is not None:
+                return found
+
+    widgets_values = node.get("widgets_values") if isinstance(node, dict) else None
+    if isinstance(widgets_values, dict):
+        for name in preferred_names:
+            found = _numeric_from_value(widgets_values.get(name), preferred_names)
+            if found is not None:
+                return found
+        if not preferred_only:
+            found = _numeric_from_value(widgets_values, preferred_names)
+            if found is not None:
+                return found
+    elif isinstance(widgets_values, (list, tuple)) and not preferred_only:
+        for value in widgets_values:
+            found = _numeric_from_value(value, preferred_names)
+            if found is not None:
+                return found
+
+    if not preferred_only:
+        found = _numeric_from_value(node.get("properties"), preferred_names)
+        if found is not None:
+            return found
+    return None
+
+
+def _workflow_linked_input_numeric_value(workflow, node, wanted_name, visited):
+    inputs = node.get("inputs") if isinstance(node, dict) else None
+    if not isinstance(inputs, list):
+        return None
+    preferred_names = _numeric_names_for_input(wanted_name)
+
+    def slot_score(slot):
+        name = str(slot.get("name", "")).lower() if isinstance(slot, dict) else ""
+        if name in preferred_names:
+            return 0
+        if name == "value":
+            return 1
+        return 2
+
+    for slot in sorted((slot for slot in inputs if isinstance(slot, dict)), key=slot_score):
+        link_id = slot.get("link")
+        if link_id is None:
+            continue
+        upstream_id = _workflow_link_origin_id(workflow, link_id)
+        if upstream_id is None:
+            continue
+        found = _workflow_node_numeric_value(workflow, upstream_id, wanted_name, visited)
+        if found is not None:
+            return found
+    return None
+
+
+def _workflow_variable_set_numeric_value(workflow, get_node, wanted_name, visited):
+    if not _workflow_node_looks_like_variable_node(get_node, "get"):
+        return None
+    get_keys = _workflow_collect_variable_keys(get_node, "get")
+    if not get_keys:
+        return None
+    for candidate in _workflow_nodes(workflow):
+        if not isinstance(candidate, dict) or candidate is get_node or _workflow_node_is_inactive(candidate):
+            continue
+        if not _workflow_node_looks_like_variable_node(candidate, "set"):
+            continue
+        set_keys = _workflow_collect_variable_keys(candidate, "set")
+        if not any(key in get_keys for key in set_keys):
+            continue
+        candidate_id = str(candidate.get("id", ""))
+        local_visited = set(visited)
+        if candidate_id and candidate_id in local_visited:
+            continue
+        if candidate_id:
+            local_visited.add(candidate_id)
+        found = _workflow_linked_input_numeric_value(workflow, candidate, wanted_name, local_visited)
+        if found is not None:
+            return found
+        found = _workflow_node_own_numeric_value(candidate, wanted_name)
+        if found is not None:
+            return found
+    return None
+
+
+def _workflow_node_numeric_value(workflow, node_id, wanted_name, visited):
+    node = _workflow_node_by_id(workflow, node_id)
+    node_key = str(node_id)
+    if not isinstance(node, dict) or node_key in visited or _workflow_node_is_inactive(node):
+        return None
+    visited.add(node_key)
+
+    found = _workflow_node_own_numeric_value(node, wanted_name, preferred_only=True)
+    if found is not None:
+        return found
+    found = _workflow_variable_set_numeric_value(workflow, node, wanted_name, visited)
+    if found is not None:
+        return found
+    found = _workflow_node_own_numeric_value(node, wanted_name)
+    if found is not None:
+        return found
+    found = _workflow_linked_input_numeric_value(workflow, node, wanted_name, visited)
+    if found is not None:
+        return found
+    return None
+
+
+def _workflow_linked_numeric_input(extra_pnginfo, unique_id, input_name, fallback):
+    workflow = (extra_pnginfo or {}).get("workflow") if isinstance(extra_pnginfo, dict) else None
+    if not isinstance(workflow, dict):
+        return _clamp_manual_dimension(fallback, fallback)
+    current = _workflow_node_by_id(workflow, unique_id)
+    link_id = _workflow_input_link_id(current, input_name)
+    if link_id is None:
+        return _clamp_manual_dimension(fallback, fallback)
+    origin_id = _workflow_link_origin_id(workflow, link_id)
+    if origin_id is None:
+        return _clamp_manual_dimension(fallback, fallback)
+    found = _workflow_node_numeric_value(workflow, origin_id, input_name, set())
+    return _clamp_manual_dimension(found if found is not None else fallback, fallback)
 
 
 def _resolve_checkpoint_from_prompt(prompt, node_id):
@@ -1604,6 +1877,8 @@ class ManualRefCollage(io.ComfyNode):
         hidden = getattr(cls, "hidden", None)
         extra_pnginfo = getattr(hidden, "extra_pnginfo", None)
         unique_id = getattr(hidden, "unique_id", None)
+        width = _workflow_linked_numeric_input(extra_pnginfo, unique_id, "width", width)
+        height = _workflow_linked_numeric_input(extra_pnginfo, unique_id, "height", height)
         image_slots = [
             _first_batch_frame(image) if _workflow_input_is_active(extra_pnginfo, unique_id, f"image_{index + 1}") else None
             for index, image in enumerate(raw_images)
