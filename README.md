@@ -1,49 +1,82 @@
 # ComfyUI-FeiHou-Toolbox
 
-<p align="right">
-  <a href="README_CN.md">🇨🇳 中文说明 (Chinese)</a>
-</p>
+A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, and group-based workflow switching.
 
-A custom node toolbox for ComfyUI. 
+Current version: **v2.0**.  
+The final version of **ManualRefCollage** is **v1.5**.
+
+<p align="right">
+  <a href="README_CN.md">中文说明</a>
+</p>
 
 ---
 
-## 🌟 Key Features
-* **Multi-Ref Scail2 Optimization:** Tailored specifically to solve data routing and composition challenges in multi-image reference Scail2 workflows.
-* **Streamlined Data Pipelines:** Enhances interface connectivity to handle multi-source tracking and mask assets with ease.
-* **Extensible Architecture:** Built as a scalable toolbox, ready to welcome diverse feature modules in upcoming releases.
+## Installation
 
-## ⚙️ Installation
+### ComfyUI Manager
 
-### Method 1: Via ComfyUI Manager (Recommended)
-1. Search for `ComfyUI-FeiHou-Toolbox` in ComfyUI Manager.
-2. Click **Install**.
-3. Restart ComfyUI.
+Search for `ComfyUI-FeiHou-Toolbox` in ComfyUI Manager, install it, then restart ComfyUI.
 
-### Method 2: Manual Git Clone
-Navigate to your ComfyUI `custom_nodes` directory and run:
+### Manual Install
 
-**git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git**
+Open your ComfyUI `custom_nodes` directory and run:
 
-Restart ComfyUI and refresh your browser page (Ctrl + F5).
+```bash
+git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git
+```
 
-## 🛠️ Nodes Overview
+After installing or updating, restart ComfyUI and hard-refresh the browser page.
 
-### 1. Create SCAIL-2 Colored Mask V2
-Modified from the official `Create SCAIL-2 Colored Mask` node to significantly enhance usability in multi-image reference scenarios.
-* **New Interfaces:** Added `prefix_track_data` input and `prefix_image_mask` output ports to facilitate seamless mask data routing.
-* **Execution Boost:** Optimizes the underlying drawing logic by utilizing the GPU preferentially to accelerate mask generation.
+---
 
-### 2. AutoRefCollage
-An automated multi-reference image collaging utility designed for multi-person character masking.
-* **Core Function:** Automatically stitches 4 separate input reference images into a single consolidated image grid.
-* **Scail2 Synergy:** Perfect for setting up and generating multi-person masks efficiently within a single canvas area.
+## Nodes Overview
 
-## 📅 Changelog
-* **v1.1.0**
-  * **Optimized AutoRefCollage Layout Logic:** Rewrote the stitching and layout algorithm for 1 to 5 people across various aspect ratios.
-  * **Expanded Image Inputs:** Added a 5th image input interface, now supporting up to 5 reference images simultaneously.
-  * **Robust Error Handling:** Missing or unconnected image inputs will no longer trigger errors; the node will gracefully output empty masks instead.
+| Node ID | Display Name | Version |
+| --- | --- | --- |
+| `SCAIL2ColoredMaskV2` | Create SCAIL-2 Colored Mask V2 | v1.0 |
+| `AutoRefCollage` | 多参图像自动拼接 | v1.0 |
+| `ManualRefCollage` | 多参图像手动拼接 | v1.5 |
+| `ComfySwitchNodeV2` | Switch V2 | v2.0 |
+| `FastGroupsBypassSwitch` | 多框忽略并切换 | v2.0 |
 
-* **v1.0.0**
-  * Repository launched with Scail2 multi-ref optimized nodes: `Create SCAIL-2 Colored Mask V2` and `AutoRefCollage`.
+### Create SCAIL-2 Colored Mask V2
+
+An enhanced version of ComfyUI's original SCAIL-2 colored mask node, built for mask routing, separation, and batch handling in multi-reference workflows.
+
+### AutoRefCollage
+
+Automatically uses SAM3/SAM3.1 to cut people out from multiple reference images and compose them into a single multi-person reference collage.
+
+### ManualRefCollage (多参图像手动拼接, v1.5)
+
+A manual collage node that loads SAM3/SAM3.1 cutouts onto an editable canvas, allowing users to adjust position and scale before outputting the final composed image.
+
+### Switch V2
+
+A revised switch node for toggling between two workflow paths while reducing issues caused by inactive branches.
+
+### FastGroupsBypassSwitch (多框忽略并切换, v2.0)
+
+A group bypass and switch node that binds two ComfyUI Groups, switches which group is active, bypasses the inactive group, and outputs the corresponding input.
+
+---
+
+## Changelog
+
+### v2.0
+
+- Added `FastGroupsBypassSwitch` (`多框忽略并切换`).
+- Supports enabling, bypassing, and output switching between two ComfyUI Groups.
+- UI follows the rgthree Fast Groups Bypasser style for large grouped workflows.
+
+### v1.5
+
+- Finalized `ManualRefCollage` (`多参图像手动拼接`).
+- Supports SAM3/SAM3.1 cutouts and manual layout for up to 5 reference images.
+- Supports using the first video frame as a composition reference while keeping the final output on a black or white background.
+
+### v1.0
+
+- Initial release.
+- Added `Create SCAIL-2 Colored Mask V2`.
+- Added `AutoRefCollage`.

@@ -20,22 +20,44 @@ model interfaces to extract people from multiple reference images and compose
 them into portrait, square, or landscape collages.
 """
 
+import base64
+import json
 import logging
+import os
+from io import BytesIO
 
 from typing_extensions import override
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from PIL import Image, ImageOps, ImageSequence
+from aiohttp import web
 
 import comfy.model_management
+import comfy.sd
 import comfy.utils
+import folder_paths
+import nodes as comfy_nodes
 from comfy_api.latest import ComfyExtension, io
 from comfy.ldm.sam3.tracker import unpack_masks
 
+try:
+    from server import PromptServer
+except Exception:  # pragma: no cover
+    PromptServer = None
+
 
 SAM3TrackData = io.Custom("SAM3_TRACK_DATA")
+MISSING = object()
+WEB_DIRECTORY = "./js"
 
 LOGGER = logging.getLogger(__name__)
+PREVIEW_CHECKPOINT_CACHE = {"name": None, "model": None, "clip": None}
+MEDIA_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif",
+    ".mp4", ".mov", ".m4v", ".avi", ".webm", ".mkv",
+}
 
 
 # Model was trained on these exact colors; deviating degrades multi-identity quality.
@@ -59,6 +81,218 @@ def _first_batch_frame(image):
     if image.shape[0] < 1 or image.shape[1] < 1 or image.shape[2] < 1 or image.shape[3] < 3:
         return None
     return image[:1, ..., :3]
+
+
+def _load_input_image_from_name(image_name):
+    image_path = _resolve_media_filepath(image_name)
+    img = Image.open(image_path)
+    frames = []
+    for frame in ImageSequence.Iterator(img):
+        frame = ImageOps.exif_transpose(frame).convert("RGB")
+        frames.append(torch.from_numpy(np.array(frame).astype(np.float32) / 255.0)[None, ...])
+        break
+    if not frames:
+        raise ValueError(f"Failed to load image: {image_name}")
+    return frames[0]
+
+
+def _resolve_media_filepath(media_name):
+    name = str(media_name or "").strip()
+    if not name:
+        raise ValueError("Missing media name.")
+    try:
+        resolved = folder_paths.get_annotated_filepath(name)
+        if os.path.exists(resolved):
+            return resolved
+    except Exception:
+        pass
+    if os.path.exists(name):
+        return name
+    input_dir = getattr(folder_paths, "get_input_directory", lambda: "")()
+    candidate = os.path.join(input_dir, os.path.basename(name)) if input_dir else ""
+    if candidate and os.path.exists(candidate):
+        return candidate
+    raise FileNotFoundError(f"Media file not found: {name}")
+
+
+def _tensor_rgba_to_data_url(rgb, alpha):
+    rgba = torch.cat([rgb.clamp(0, 1), alpha.clamp(0, 1).unsqueeze(-1)], dim=-1)
+    arr = (rgba.cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+    image = Image.fromarray(arr, mode="RGBA")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def _tensor_rgb_to_data_url(rgb):
+    arr = (rgb.clamp(0, 1).cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+    if arr.ndim == 4:
+        arr = arr[0]
+    image = Image.fromarray(arr, mode="RGB")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def _load_media_first_frame_from_name(media_name):
+    media_path = _resolve_media_filepath(media_name)
+    ext = os.path.splitext(media_path)[1].lower()
+    if ext in {".mp4", ".mov", ".m4v", ".avi", ".webm", ".mkv"}:
+        try:
+            import cv2
+            cap = cv2.VideoCapture(media_path)
+            try:
+                ok, frame = cap.read()
+            finally:
+                cap.release()
+            if ok and frame is not None:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                return torch.from_numpy(frame.astype(np.float32) / 255.0)[None, ...]
+        except Exception:
+            pass
+        try:
+            import imageio.v3 as iio
+            frame = iio.imread(media_path, index=0)
+            if frame is not None:
+                if frame.ndim == 2:
+                    frame = np.stack([frame, frame, frame], axis=-1)
+                return torch.from_numpy(frame[..., :3].astype(np.float32) / 255.0)[None, ...]
+        except Exception as exc:  # pragma: no cover
+            raise ValueError("无法读取视频首帧，请检查视频文件或相关依赖。") from exc
+        raise ValueError(f"Failed to load video first frame: {media_name}")
+    return _load_input_image_from_name(media_name)
+
+
+def _resolve_prompt_node(prompt, node_id):
+    if not isinstance(prompt, dict):
+        return None
+    return prompt.get(str(node_id)) or prompt.get(node_id)
+
+
+def _extract_media_name_from_value(value):
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return ""
+        lower = stripped.lower()
+        for ext in MEDIA_EXTENSIONS:
+            if lower.endswith(ext) or f"{ext} " in lower or f"{ext}[" in lower:
+                return stripped
+        return ""
+    if isinstance(value, dict):
+        for item in value.values():
+            found = _extract_media_name_from_value(item)
+            if found:
+                return found
+        return ""
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            found = _extract_media_name_from_value(item)
+            if found:
+                return found
+        return ""
+    return ""
+
+
+def _normalize_media_name(value):
+    extracted = _extract_media_name_from_value(value)
+    if extracted:
+        return extracted.strip()
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return ""
+        try:
+            _resolve_media_filepath(stripped)
+            return stripped
+        except Exception:
+            return ""
+    return ""
+
+
+def _iter_upstream_node_ids(prompt, value):
+    if isinstance(value, list) and len(value) == 2 and _resolve_prompt_node(prompt, value[0]) is not None:
+        yield value[0]
+        return
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_upstream_node_ids(prompt, item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _iter_upstream_node_ids(prompt, item)
+
+
+def _resolve_media_name_from_node(prompt, node_id, visited):
+    source = _resolve_prompt_node(prompt, node_id)
+    node_key = str(node_id)
+    if not isinstance(source, dict) or node_key in visited:
+        return ""
+    visited.add(node_key)
+    source_inputs = source.get("inputs", {})
+
+    for key in ("image", "video", "upload", "filename", "file", "path", "media", "video_file", "image_name"):
+        found = _extract_media_name_from_value(source_inputs.get(key))
+        if found:
+            return found
+    for value in source_inputs.values():
+        found = _extract_media_name_from_value(value)
+        if found:
+            return found
+    for value in source_inputs.values():
+        for upstream_id in _iter_upstream_node_ids(prompt, value):
+            found = _resolve_media_name_from_node(prompt, upstream_id, visited)
+            if found:
+                return found
+    return ""
+
+
+def _resolve_linked_media_name(prompt, node_id, input_name):
+    prompt_node = _resolve_prompt_node(prompt, node_id)
+    if not isinstance(prompt_node, dict):
+        return ""
+    link = prompt_node.get("inputs", {}).get(input_name)
+    if not isinstance(link, list) or len(link) != 2:
+        return ""
+    return _resolve_media_name_from_node(prompt, link[0], set())
+
+
+def _resolve_checkpoint_from_prompt(prompt, node_id):
+    prompt_node = prompt.get(str(node_id)) or prompt.get(node_id)
+    if not isinstance(prompt_node, dict):
+        return None
+    inputs = prompt_node.get("inputs", {})
+    model_link = inputs.get("model")
+    if not isinstance(model_link, list) or len(model_link) != 2:
+        return None
+    source_id = str(model_link[0])
+    source = prompt.get(source_id) or prompt.get(model_link[0])
+    if not isinstance(source, dict):
+        return None
+    if source.get("class_type") != "CheckpointLoaderSimple":
+        return None
+    ckpt_name = source.get("inputs", {}).get("ckpt_name")
+    return str(ckpt_name) if ckpt_name else None
+
+
+def _load_preview_model_and_clip(ckpt_name):
+    if not ckpt_name:
+        raise ValueError("Missing checkpoint name for SAM3 preview.")
+    cached_name = PREVIEW_CHECKPOINT_CACHE["name"]
+    if cached_name == ckpt_name and PREVIEW_CHECKPOINT_CACHE["model"] is not None and PREVIEW_CHECKPOINT_CACHE["clip"] is not None:
+        return PREVIEW_CHECKPOINT_CACHE["model"], PREVIEW_CHECKPOINT_CACHE["clip"]
+    ckpt_path = folder_paths.get_full_path_or_raise("checkpoints", ckpt_name)
+    model, clip, _vae, *_ = comfy.sd.load_checkpoint_guess_config(
+        ckpt_path,
+        output_vae=True,
+        output_clip=True,
+        embedding_directory=folder_paths.get_folder_paths("embeddings"),
+    )
+    PREVIEW_CHECKPOINT_CACHE["name"] = ckpt_name
+    PREVIEW_CHECKPOINT_CACHE["model"] = model
+    PREVIEW_CHECKPOINT_CACHE["clip"] = clip
+    return model, clip
 
 
 def _mask_bbox(mask, pad=0):
@@ -611,6 +845,154 @@ def _compose_collage(cutouts, width, height, background):
     return canvas.unsqueeze(0).clamp(0, 1), canvas_alpha.unsqueeze(0).clamp(0, 1)
 
 
+def _default_manual_layout(count, width, height):
+    if count <= 0:
+        return []
+    min_scale = min(width / max(1, height), height / max(1, width))
+    scale = max(0.2, min(0.55, 0.38 * min_scale + 0.14))
+    return [
+        {
+            "x": (index + 0.5) / count,
+            "y": 0.72,
+            "scale": scale,
+            "z": count - index,
+        }
+        for index in range(count)
+    ]
+
+
+def _parse_manual_layout(layout_json, count, width, height, background):
+    layout = {}
+    if isinstance(layout_json, str) and layout_json.strip():
+        try:
+            decoded = json.loads(layout_json)
+            if isinstance(decoded, dict):
+                layout = decoded
+        except json.JSONDecodeError:
+            LOGGER.warning("ManualRefCollage: invalid layout_json; using default layout.")
+
+    output_width = int(layout.get("width") or width)
+    output_height = int(layout.get("height") or height)
+    output_width = max(64, min(8192, output_width))
+    output_height = max(64, min(8192, output_height))
+
+    output_background = str(layout.get("background") or background or "black").lower()
+    if output_background not in ("white", "black"):
+        output_background = "black"
+
+    raw_items = layout.get("items")
+    default_items = _default_manual_layout(count, output_width, output_height)
+    items = []
+    for index in range(count):
+        item = raw_items[index] if isinstance(raw_items, list) and index < len(raw_items) and isinstance(raw_items[index], dict) else {}
+        fallback = default_items[index]
+        try:
+            x = float(item.get("x", fallback["x"]))
+            y = float(item.get("y", fallback["y"]))
+            scale = float(item.get("scale", fallback["scale"]))
+            z = int(item.get("z", fallback["z"]))
+        except (TypeError, ValueError):
+            x, y, scale, z = fallback["x"], fallback["y"], fallback["scale"], fallback["z"]
+        items.append(
+            {
+                "x": max(-1.0, min(2.0, x)),
+                "y": max(-1.0, min(2.0, y)),
+                "scale": max(0.02, min(4.0, scale)),
+                "z": z,
+            }
+        )
+    return output_width, output_height, output_background, items
+
+
+def _paste_manual_cutout(canvas, canvas_alpha, cutout, item, out_width, out_height):
+    rgb = cutout["rgb"].to(device=canvas.device, dtype=canvas.dtype).movedim(-1, 0).unsqueeze(0)
+    alpha = cutout["alpha"].to(device=canvas.device, dtype=canvas.dtype).unsqueeze(0).unsqueeze(0)
+    base = min(out_width, out_height)
+    target_h = max(1, int(round(base * item["scale"])))
+    scale = target_h / max(1, cutout["height"])
+    new_w = max(1, int(round(cutout["width"] * scale)))
+    new_h = max(1, int(round(cutout["height"] * scale)))
+
+    rgb = F.interpolate(rgb, size=(new_h, new_w), mode="bilinear", align_corners=False)[0].movedim(0, -1)
+    alpha = F.interpolate(alpha, size=(new_h, new_w), mode="bilinear", align_corners=False)[0, 0].clamp(0, 1)
+
+    cx = int(round(item["x"] * out_width))
+    cy = int(round(item["y"] * out_height))
+    x0 = cx - new_w // 2
+    y0 = cy - new_h // 2
+    x1 = x0 + new_w
+    y1 = y0 + new_h
+
+    src_x0 = max(0, -x0)
+    src_y0 = max(0, -y0)
+    dst_x0 = max(0, x0)
+    dst_y0 = max(0, y0)
+    dst_x1 = min(out_width, x1)
+    dst_y1 = min(out_height, y1)
+    if dst_x1 <= dst_x0 or dst_y1 <= dst_y0:
+        return
+
+    src_x1 = src_x0 + (dst_x1 - dst_x0)
+    src_y1 = src_y0 + (dst_y1 - dst_y0)
+    src_rgb = rgb[src_y0:src_y1, src_x0:src_x1]
+    src_alpha = alpha[src_y0:src_y1, src_x0:src_x1].unsqueeze(-1)
+    dst = canvas[dst_y0:dst_y1, dst_x0:dst_x1]
+    canvas[dst_y0:dst_y1, dst_x0:dst_x1] = src_rgb * src_alpha + dst * (1.0 - src_alpha)
+    old_alpha = canvas_alpha[dst_y0:dst_y1, dst_x0:dst_x1]
+    canvas_alpha[dst_y0:dst_y1, dst_x0:dst_x1] = torch.maximum(old_alpha, src_alpha[..., 0])
+
+
+def _build_manual_background_canvas(out_width, out_height, background, background_frame=None, background_opacity=0.0):
+    device = comfy.model_management.intermediate_device()
+    dtype = torch.float32
+    bg = torch.tensor(_background_rgb(background), device=device, dtype=dtype)
+    canvas = bg.view(1, 1, 3).expand(out_height, out_width, 3).clone()
+    opacity = max(0.0, min(float(background_opacity), 1.0))
+    if background_frame is None or opacity <= 0.0:
+        return canvas
+
+    rgb = background_frame[:1, ..., :3].to(device=device, dtype=dtype).movedim(-1, 1)
+    rgb = F.interpolate(rgb, size=(out_height, out_width), mode="bilinear", align_corners=False)[0].movedim(0, -1)
+    return rgb.clamp(0, 1) * opacity + canvas * (1.0 - opacity)
+
+
+def _compose_manual_collage(
+    cutouts,
+    width,
+    height,
+    background,
+    layout_json,
+    background_frame=None,
+    background_opacity=0.0,
+):
+    out_width, out_height, out_background, items = _parse_manual_layout(
+        layout_json,
+        len(cutouts),
+        int(width),
+        int(height),
+        background,
+    )
+    device = comfy.model_management.intermediate_device()
+    dtype = torch.float32
+    canvas = _build_manual_background_canvas(
+        out_width,
+        out_height,
+        out_background,
+        background_frame=background_frame,
+        background_opacity=background_opacity,
+    ).to(device=device, dtype=dtype)
+    canvas_alpha = torch.zeros((out_height, out_width), device=device, dtype=dtype)
+    draw_items = []
+    for index, item in enumerate(items):
+        cutout = cutouts[index] if index < len(cutouts) else None
+        if cutout is None:
+            continue
+        draw_items.append((item["z"], index, cutout, item))
+    for _, index, cutout, item in sorted(draw_items):
+        _paste_manual_cutout(canvas, canvas_alpha, cutout, item, out_width, out_height)
+    return canvas.unsqueeze(0).clamp(0, 1), canvas_alpha.unsqueeze(0).clamp(0, 1)
+
+
 def _blank_collage_output(width, height, background):
     collage = _blank_images(1, height, width, background)
     alpha_mask = torch.zeros((1, height, width), device=collage.device, dtype=collage.dtype)
@@ -1017,12 +1399,375 @@ class AutoRefCollage(io.ComfyNode):
         return io.NodeOutput(collage, alpha_mask)
 
 
+class ManualRefCollage(io.ComfyNode):
+    """Extract up to 5 reference people with SAM3 and compose using a saved manual layout."""
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ManualRefCollage",
+            display_name="多参图像手动拼接",
+            category="image/compositing",
+            search_aliases=["manual reference collage", "sam3 manual collage", "multi reference"],
+            inputs=[
+                io.Model.Input(
+                    "model",
+                    display_name="model",
+                    tooltip="SAM3/SAM3.1 model from CheckpointLoaderSimple.",
+                ),
+                io.Clip.Input(
+                    "clip",
+                    display_name="clip",
+                    tooltip="SAM3/SAM3.1 CLIP from CheckpointLoaderSimple. The node encodes the prompt with this input.",
+                ),
+                io.Image.Input("image_1", display_name="image_1", optional=True),
+                io.Image.Input("image_2", display_name="image_2", optional=True),
+                io.Image.Input("image_3", display_name="image_3", optional=True),
+                io.Image.Input("image_4", display_name="image_4", optional=True),
+                io.Image.Input("image_5", display_name="image_5", optional=True),
+                io.Image.Input("video_frame", display_name="video_frame", optional=True),
+                io.String.Input(
+                    "prompt",
+                    display_name="prompt",
+                    default="person",
+                    multiline=True,
+                    tooltip="Text prompt used internally for SAM3 detection. Use a short object phrase, e.g. person or woman.",
+                ),
+                io.String.Input(
+                    "layout_json",
+                    display_name="layout_json",
+                    default="",
+                    multiline=True,
+                    tooltip="Internal manual collage layout saved by the node UI.",
+                ),
+                io.Int.Input(
+                    "width",
+                    display_name="width",
+                    default=1280,
+                    min=64,
+                    max=8192,
+                    step=8,
+                    tooltip="Output collage width.",
+                ),
+                io.Int.Input(
+                    "height",
+                    display_name="height",
+                    default=1280,
+                    min=64,
+                    max=8192,
+                    step=8,
+                    tooltip="Output collage height.",
+                ),
+                io.Float.Input(
+                    "detection_threshold",
+                    display_name="detection_threshold",
+                    default=0.5,
+                    min=0.0,
+                    max=1.0,
+                    step=0.01,
+                    tooltip="SAM3 mask threshold after segmentation. Lower values keep more edge/detail; higher values remove weak regions.",
+                ),
+                io.Float.Input(
+                    "background_opacity",
+                    display_name="background_opacity",
+                    default=0.3,
+                    min=0.0,
+                    max=1.0,
+                    step=0.01,
+                    tooltip="Background video frame opacity mixed over the black/white collage background.",
+                ),
+                io.Combo.Input(
+                    "background",
+                    display_name="background",
+                    options=["black", "white"],
+                    default="black",
+                    tooltip="Background color for the RGB collage image output.",
+                ),
+            ],
+            outputs=[
+                io.Image.Output("collage"),
+                io.Mask.Output("alpha_mask"),
+            ],
+            is_experimental=True,
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        model,
+        clip,
+        image_1=None,
+        image_2=None,
+        video_frame=None,
+        prompt="person",
+        layout_json="",
+        width=1280,
+        height=1280,
+        detection_threshold=0.5,
+        background_opacity=0.3,
+        background="black",
+        image_3=None,
+        image_4=None,
+        image_5=None,
+    ) -> io.NodeOutput:
+        image_slots = [
+            _first_batch_frame(image_1),
+            _first_batch_frame(image_2),
+            _first_batch_frame(image_3),
+            _first_batch_frame(image_4),
+            _first_batch_frame(image_5),
+        ]
+        out_width, out_height, out_background, _ = _parse_manual_layout(
+            layout_json,
+            len(image_slots),
+            int(width),
+            int(height),
+            background,
+        )
+        image_count = sum(image is not None for image in image_slots)
+        if image_count == 0:
+            collage, alpha_mask = _blank_collage_output(out_width, out_height, out_background)
+            return io.NodeOutput(collage, alpha_mask)
+
+        threshold = max(0.0, min(float(detection_threshold), 1.0))
+        conditioning = _encode_sam3_prompt(clip, prompt)
+        cutouts = [None] * len(image_slots)
+        pbar = comfy.utils.ProgressBar(image_count)
+        for index, image in enumerate(image_slots):
+            if image is None:
+                continue
+            alpha = _segment_person_with_sam3(
+                model,
+                image,
+                prompt,
+                conditioning,
+                threshold,
+            )
+            cutouts[index] = _prepare_cutout(image, alpha.to(image.device))
+            pbar.update(1)
+
+        collage, alpha_mask = _compose_manual_collage(
+            cutouts,
+            out_width,
+            out_height,
+            out_background,
+            layout_json,
+        )
+        return io.NodeOutput(collage, alpha_mask)
+
+
+class ComfySwitchNodeV2(io.ComfyNode):
+    """Switch node variant that only requires the selected branch to be connected."""
+
+    @classmethod
+    def define_schema(cls):
+        template = io.MatchType.Template("switch")
+        return io.Schema(
+            node_id="ComfySwitchNodeV2",
+            display_name="Switch V2",
+            category="utilities/logic",
+            is_experimental=True,
+            inputs=[
+                io.Boolean.Input("switch"),
+                io.MatchType.Input("on_false", template=template, display_name="false", lazy=True, optional=True),
+                io.MatchType.Input("on_true", template=template, display_name="true", lazy=True, optional=True),
+            ],
+            outputs=[
+                io.MatchType.Output(template=template, display_name="output"),
+            ],
+        )
+
+    @classmethod
+    def check_lazy_status(cls, switch, on_false=MISSING, on_true=MISSING):
+        if switch and on_true is None:
+            return ["on_true"]
+        if not switch and on_false is None:
+            return ["on_false"]
+
+    @classmethod
+    def validate_inputs(cls, switch, on_false=MISSING, on_true=MISSING):
+        if switch and on_true is MISSING:
+            return "请在true接口接上相关节点。"
+        if not switch and on_false is MISSING:
+            return "请在false接口接上相关节点。"
+        return True
+
+    @classmethod
+    def execute(cls, switch, on_true=MISSING, on_false=MISSING) -> io.NodeOutput:
+        if switch:
+            if on_true is MISSING:
+                raise ValueError("请在true接口接上相关节点。")
+            return io.NodeOutput(on_true)
+        if on_false is MISSING:
+            raise ValueError("请在false接口接上相关节点。")
+        return io.NodeOutput(on_false)
+
+
+class FastGroupsBypassSwitch(io.ComfyNode):
+    """Two-route switch node that also drives workflow group bypass/enable state from the frontend."""
+
+    @classmethod
+    def define_schema(cls):
+        template = io.MatchType.Template("fast_groups_bypass_switch")
+        return io.Schema(
+            node_id="FastGroupsBypassSwitch",
+            display_name="多框忽略并切换",
+            category="utilities/logic",
+            search_aliases=["fast groups bypass switch", "group bypass switch", "多框忽略并切换"],
+            is_experimental=True,
+            inputs=[
+                io.MatchType.Input("input1", template=template, display_name="input1", lazy=True, optional=True),
+                io.MatchType.Input("input2", template=template, display_name="input2", lazy=True, optional=True),
+            ],
+            outputs=[
+                io.MatchType.Output(template=template, display_name="output"),
+            ],
+            hidden=[io.Hidden.unique_id, io.Hidden.extra_pnginfo],
+        )
+
+    @staticmethod
+    def _selected_group(value):
+        try:
+            parsed = int(value)
+        except Exception:
+            parsed = 1
+        return 2 if parsed == 2 else 1
+
+    @staticmethod
+    def _group_label(name, fallback):
+        text = str(name or "").strip()
+        return text or fallback
+
+    @staticmethod
+    def _workflow_node(extra_pnginfo, unique_id):
+        workflow = (extra_pnginfo or {}).get("workflow") if isinstance(extra_pnginfo, dict) else None
+        nodes = workflow.get("nodes") if isinstance(workflow, dict) else None
+        if not isinstance(nodes, list):
+            return {}
+        wanted = str(unique_id)
+        for node in nodes:
+            if str(node.get("id")) == wanted:
+                return node
+        return {}
+
+    @classmethod
+    def _ui_state(cls, extra_pnginfo=None, unique_id=None):
+        node = cls._workflow_node(extra_pnginfo, unique_id)
+        properties = node.get("properties") if isinstance(node, dict) else {}
+        if not isinstance(properties, dict):
+            properties = {}
+        return {
+            "selected_group": cls._selected_group(properties.get("fh_selected_group", 1)),
+            "group_1_name": cls._group_label(properties.get("fh_group_1_name", ""), "input1"),
+            "group_2_name": cls._group_label(properties.get("fh_group_2_name", ""), "input2"),
+        }
+
+    @classmethod
+    def check_lazy_status(
+        cls,
+        input1=MISSING,
+        input2=MISSING,
+    ):
+        selected = cls._ui_state(cls.hidden.extra_pnginfo, cls.hidden.unique_id)["selected_group"]
+        if selected == 1 and input1 is None:
+            return ["input1"]
+        if selected == 2 and input2 is None:
+            return ["input2"]
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        input1=MISSING,
+        input2=MISSING,
+    ):
+        return True
+
+    @classmethod
+    def execute(
+        cls,
+        input1=MISSING,
+        input2=MISSING,
+    ) -> io.NodeOutput:
+        state = cls._ui_state(cls.hidden.extra_pnginfo, cls.hidden.unique_id)
+        selected = state["selected_group"]
+        if selected == 1:
+            if input1 is MISSING:
+                raise ValueError(f"请在{cls._group_label(state['group_1_name'], 'input1')}接口接上相关节点。")
+            return io.NodeOutput(input1)
+        if input2 is MISSING:
+            raise ValueError(f"请在{cls._group_label(state['group_2_name'], 'input2')}接口接上相关节点。")
+        return io.NodeOutput(input2)
+
+
+if PromptServer is not None:
+    @PromptServer.instance.routes.post("/feihou/manual_collage/load")
+    async def feihou_manual_collage_load(request):
+        try:
+            data = await request.json()
+            prompt_data = data.get("prompt") or {}
+            node_id = data.get("node_id")
+            prompt = str(data.get("prompt_text") or "person").strip() or "person"
+            image_names = list(data.get("images") or [])
+            while len(image_names) < 5:
+                image_names.append("")
+            image_names = [
+                _normalize_media_name(image_names[index]) or _resolve_linked_media_name(prompt_data, node_id, f"image_{index + 1}")
+                for index in range(5)
+            ]
+            video_name = _normalize_media_name(data.get("video_frame")) or _resolve_linked_media_name(prompt_data, node_id, "video_frame")
+
+            previews = []
+            ckpt_name = ""
+            if any(image_names):
+                ckpt_name = _resolve_checkpoint_from_prompt(prompt_data, node_id)
+                if not ckpt_name:
+                    return web.json_response({"success": False, "error": "未找到上游 CheckpointLoaderSimple 节点。"}, status=400)
+
+                model, clip = _load_preview_model_and_clip(ckpt_name)
+                conditioning = _encode_sam3_prompt(clip, prompt)
+                threshold = max(0.0, min(float(data.get("detection_threshold", 0.5)), 1.0))
+
+                for image_name in image_names:
+                    if not image_name:
+                        previews.append("")
+                        continue
+                    image = _load_input_image_from_name(image_name)
+                    image = image.to(device=comfy.model_management.intermediate_device(), dtype=torch.float32)
+                    alpha = _segment_person_with_sam3(model, image, prompt, conditioning, threshold)
+                    cutout = _prepare_cutout(image, alpha.to(image.device))
+                    previews.append(_tensor_rgba_to_data_url(cutout["rgb"], cutout["alpha"]))
+
+            while len(previews) < 5:
+                previews.append("")
+
+            background_preview = ""
+            if video_name:
+                try:
+                    background_frame = _load_media_first_frame_from_name(video_name)
+                    background_preview = _tensor_rgb_to_data_url(background_frame)
+                except Exception:
+                    LOGGER.warning("ManualRefCollage background preview load skipped for %s", video_name, exc_info=True)
+
+            return web.json_response({
+                "success": True,
+                "previews": previews,
+                "background_preview": background_preview,
+                "checkpoint": ckpt_name,
+            })
+        except Exception as exc:
+            LOGGER.exception("ManualRefCollage preview load failed")
+            return web.json_response({"success": False, "error": str(exc)}, status=500)
+
+
 class FeiHouToolboxExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
         return [
             SCAIL2ColoredMaskV2,
             AutoRefCollage,
+            ManualRefCollage,
+            ComfySwitchNodeV2,
+            FastGroupsBypassSwitch,
         ]
 
 
