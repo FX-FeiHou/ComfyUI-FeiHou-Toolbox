@@ -11,6 +11,7 @@ const MAX_STAGE_SIZE = 512;
 const MIN_NODE_WIDTH = 420;
 const MIN_NODE_HEIGHT = 260;
 const MIN_DOM_HEIGHT = 48;
+const INACTIVE_NODE_MODES = new Set([2, 4]);
 const MEDIA_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".mp4", ".mov", ".m4v", ".avi", ".webm", ".mkv"];
 const HELP_ICON_SIZE = 14;
 const HELP_ICON_MARGIN = 4;
@@ -389,16 +390,31 @@ function hasLinkedInput(node, inputName) {
   return !!input?.link;
 }
 
-function getLinkedMediaName(node, inputName, visited = new Set()) {
+function getLinkedSourceNode(node, inputName) {
   const input = node.inputs?.find((slot) => slot && slot.name === inputName);
-  if (!input?.link) return "";
+  if (!input?.link) return null;
   const link = app.graph?.links?.[input.link];
-  if (!link) return "";
-  const sourceId = String(link.origin_id);
+  if (!link) return null;
+  return app.graph?.getNodeById?.(link.origin_id) || null;
+}
+
+function isNodeActive(node) {
+  if (!node) return false;
+  return !INACTIVE_NODE_MODES.has(Number(node.mode));
+}
+
+function isLinkedInputActive(node, inputName) {
+  const input = node.inputs?.find((slot) => slot && slot.name === inputName);
+  if (!input?.link) return false;
+  return isNodeActive(getLinkedSourceNode(node, inputName));
+}
+
+function getLinkedMediaName(node, inputName, visited = new Set()) {
+  const source = getLinkedSourceNode(node, inputName);
+  if (!source || !isNodeActive(source)) return "";
+  const sourceId = String(source.id);
   if (visited.has(sourceId)) return "";
   visited.add(sourceId);
-  const source = app.graph?.getNodeById?.(link.origin_id);
-  if (!source) return "";
 
   const preferredNames = ["image", "video", "upload", "filename", "file", "path", "image_name", "video_file", "media"];
   const widgetValues = source.widgets || [];
@@ -1002,12 +1018,17 @@ function buildManualUI(node) {
 
   async function loadImages() {
     const imageNames = [];
-    let hasLinkedSource = hasLinkedInput(node, "video_frame");
+    const imageEnabled = [];
+    let hasLinkedSource = isLinkedInputActive(node, "video_frame");
     for (let index = 1; index <= 5; index++) {
-      hasLinkedSource = hasLinkedSource || hasLinkedInput(node, `image_${index}`);
-      imageNames.push(getLinkedMediaName(node, `image_${index}`));
+      const inputName = `image_${index}`;
+      const enabled = isLinkedInputActive(node, inputName);
+      imageEnabled.push(enabled);
+      hasLinkedSource = hasLinkedSource || enabled;
+      imageNames.push(enabled ? getLinkedMediaName(node, inputName) : "");
     }
-    const videoName = getLinkedMediaName(node, "video_frame");
+    const videoEnabled = isLinkedInputActive(node, "video_frame");
+    const videoName = videoEnabled ? getLinkedMediaName(node, "video_frame") : "";
     if (!hasLinkedSource) {
       resetPreviewState();
       renderFull();
@@ -1026,7 +1047,9 @@ function buildManualUI(node) {
           prompt: promptData?.output || promptData || {},
           prompt_text: state.prompt,
           images: imageNames,
+          image_enabled: imageEnabled,
           video_frame: videoName,
+          video_frame_enabled: videoEnabled,
           detection_threshold: num(thresholdWidget?.value, 0.5),
         }),
       });

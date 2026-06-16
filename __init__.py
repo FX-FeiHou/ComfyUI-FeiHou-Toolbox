@@ -58,6 +58,7 @@ MEDIA_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif",
     ".mp4", ".mov", ".m4v", ".avi", ".webm", ".mkv",
 }
+INACTIVE_NODE_MODES = {2, 4}
 
 
 # Model was trained on these exact colors; deviating degrades multi-identity quality.
@@ -69,6 +70,7 @@ DEFAULT_PALETTE = [
     (0.0, 1.0, 1.0),  # Cyan
     (1.0, 1.0, 0.0),  # Yellow
 ]
+PREFIX_BATCH_PALETTE = DEFAULT_PALETTE[:5]
 
 
 def _first_batch_frame(image):
@@ -256,6 +258,85 @@ def _resolve_linked_media_name(prompt, node_id, input_name):
     if not isinstance(link, list) or len(link) != 2:
         return ""
     return _resolve_media_name_from_node(prompt, link[0], set())
+
+
+def _bool_enabled(value, default=True):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off", "disabled", "bypassed", "skip", "skipped"}
+    return default
+
+
+def _clamp_manual_dimension(value, fallback):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = int(fallback)
+    return max(64, min(8192, parsed))
+
+
+def _workflow_node_by_id(workflow, node_id):
+    nodes = workflow.get("nodes") if isinstance(workflow, dict) else None
+    if not isinstance(nodes, list):
+        return {}
+    wanted = str(node_id)
+    for node in nodes:
+        if isinstance(node, dict) and str(node.get("id")) == wanted:
+            return node
+    return {}
+
+
+def _workflow_link_origin_id(workflow, link_id):
+    links = workflow.get("links") if isinstance(workflow, dict) else None
+    if not isinstance(links, list):
+        return None
+    wanted = str(link_id)
+    for link in links:
+        if isinstance(link, dict):
+            current_id = link.get("id", link.get("link_id"))
+            if str(current_id) == wanted:
+                return link.get("origin_id", link.get("source_id"))
+        elif isinstance(link, (list, tuple)) and len(link) >= 2 and str(link[0]) == wanted:
+            return link[1]
+    return None
+
+
+def _workflow_input_link_id(node, input_name):
+    inputs = node.get("inputs") if isinstance(node, dict) else None
+    if isinstance(inputs, list):
+        for slot in inputs:
+            if isinstance(slot, dict) and slot.get("name") == input_name:
+                return slot.get("link")
+    return None
+
+
+def _workflow_node_is_inactive(node):
+    if not isinstance(node, dict):
+        return False
+    try:
+        mode = int(node.get("mode", 0))
+    except (TypeError, ValueError):
+        return False
+    return mode in INACTIVE_NODE_MODES
+
+
+def _workflow_input_is_active(extra_pnginfo, unique_id, input_name):
+    workflow = (extra_pnginfo or {}).get("workflow") if isinstance(extra_pnginfo, dict) else None
+    if not isinstance(workflow, dict):
+        return True
+    current = _workflow_node_by_id(workflow, unique_id)
+    link_id = _workflow_input_link_id(current, input_name)
+    if link_id is None:
+        return True
+    origin_id = _workflow_link_origin_id(workflow, link_id)
+    if origin_id is None:
+        return True
+    return not _workflow_node_is_inactive(_workflow_node_by_id(workflow, origin_id))
 
 
 def _resolve_checkpoint_from_prompt(prompt, node_id):
@@ -861,7 +942,7 @@ def _default_manual_layout(count, width, height):
     ]
 
 
-def _parse_manual_layout(layout_json, count, width, height, background):
+def _parse_manual_layout(layout_json, count, width, height, background, use_layout_size=True):
     layout = {}
     if isinstance(layout_json, str) and layout_json.strip():
         try:
@@ -871,10 +952,8 @@ def _parse_manual_layout(layout_json, count, width, height, background):
         except json.JSONDecodeError:
             LOGGER.warning("ManualRefCollage: invalid layout_json; using default layout.")
 
-    output_width = int(layout.get("width") or width)
-    output_height = int(layout.get("height") or height)
-    output_width = max(64, min(8192, output_width))
-    output_height = max(64, min(8192, output_height))
+    output_width = _clamp_manual_dimension(layout.get("width") if use_layout_size else width, width)
+    output_height = _clamp_manual_dimension(layout.get("height") if use_layout_size else height, height)
 
     output_background = str(layout.get("background") or background or "black").lower()
     if output_background not in ("white", "black"):
@@ -964,6 +1043,7 @@ def _compose_manual_collage(
     layout_json,
     background_frame=None,
     background_opacity=0.0,
+    use_layout_size=True,
 ):
     out_width, out_height, out_background, items = _parse_manual_layout(
         layout_json,
@@ -971,6 +1051,7 @@ def _compose_manual_collage(
         int(width),
         int(height),
         background,
+        use_layout_size=use_layout_size,
     )
     device = comfy.model_management.intermediate_device()
     dtype = torch.float32
@@ -1097,7 +1178,7 @@ def _render_colored_masks(track_data, background="black", render_device="auto"):
 def _render_prefix_image_masks(
     track_data,
     background="white",
-    prefix_mask_mode="Single Image Multi Color",
+    prefix_mask_mode="Multi Image Single Color",
     max_images=5,
     render_device="auto",
 ):
@@ -1130,14 +1211,22 @@ def _render_prefix_image_masks(
 
     bg = torch.tensor(_background_rgb(background), device=device, dtype=dtype).view(1, 1, 1, 3)
     blank = bg.expand(frame_count, height, width, 3)
+    any_mask = masks_full.any(dim=1)
 
     if prefix_mask_mode == "Multi Image Single Color":
-        any_mask = masks_full.any(dim=1)
-        blue = torch.tensor(DEFAULT_PALETTE[0], device=device, dtype=dtype).view(1, 1, 1, 3)
-        color_overlay = blue.expand(frame_count, height, width, 3)
+        color = torch.tensor(DEFAULT_PALETTE[0], device=device, dtype=dtype).view(1, 1, 1, 3)
+        color_overlay = color.expand(frame_count, height, width, 3)
         return torch.where(any_mask.unsqueeze(-1), color_overlay, blank)
 
-    any_mask = masks_full.any(dim=1)
+    if prefix_mask_mode == "Single Image Multi Color":
+        colors = torch.tensor(
+            [PREFIX_BATCH_PALETTE[i % len(PREFIX_BATCH_PALETTE)] for i in range(frame_count)],
+            device=device,
+            dtype=dtype,
+        ).view(frame_count, 1, 1, 3)
+        color_overlay = colors.expand(frame_count, height, width, 3)
+        return torch.where(any_mask.unsqueeze(-1), color_overlay, blank)
+
     colors = torch.tensor(
         [DEFAULT_PALETTE[i % len(DEFAULT_PALETTE)] for i in range(n_obj)],
         device=device,
@@ -1185,9 +1274,9 @@ class SCAIL2ColoredMaskV2(io.ComfyNode):
                 ),
                 io.Combo.Input(
                     "prefix_mask_mode",
-                    options=["Single Image Multi Color", "Multi Image Single Color"],
-                    default="Single Image Multi Color",
-                    tooltip="Single Image Multi Color = each prefix image can show multiple object colors using the 6-color palette loop. Multi Image Single Color = every prefix image mask is blue.",
+                    options=["Multi Image Single Color", "Multi Image Multi Color", "Single Image Multi Color"],
+                    default="Multi Image Single Color",
+                    tooltip="Multi Image Single Color = each output batch image is single-color matching the reference_image_mask foreground color. Multi Image Multi Color = each batch image uses object colors by the node palette rule. Single Image Multi Color = single-color output by batch order: blue, red, green, magenta, cyan, then loop.",
                 ),
                 io.Boolean.Input(
                     "replacement_mode",
@@ -1488,6 +1577,7 @@ class ManualRefCollage(io.ComfyNode):
                 io.Image.Output("collage"),
                 io.Mask.Output("alpha_mask"),
             ],
+            hidden=[io.Hidden.unique_id, io.Hidden.extra_pnginfo],
             is_experimental=True,
         )
 
@@ -1510,12 +1600,13 @@ class ManualRefCollage(io.ComfyNode):
         image_4=None,
         image_5=None,
     ) -> io.NodeOutput:
+        raw_images = [image_1, image_2, image_3, image_4, image_5]
+        hidden = getattr(cls, "hidden", None)
+        extra_pnginfo = getattr(hidden, "extra_pnginfo", None)
+        unique_id = getattr(hidden, "unique_id", None)
         image_slots = [
-            _first_batch_frame(image_1),
-            _first_batch_frame(image_2),
-            _first_batch_frame(image_3),
-            _first_batch_frame(image_4),
-            _first_batch_frame(image_5),
+            _first_batch_frame(image) if _workflow_input_is_active(extra_pnginfo, unique_id, f"image_{index + 1}") else None
+            for index, image in enumerate(raw_images)
         ]
         out_width, out_height, out_background, _ = _parse_manual_layout(
             layout_json,
@@ -1523,6 +1614,7 @@ class ManualRefCollage(io.ComfyNode):
             int(width),
             int(height),
             background,
+            use_layout_size=False,
         )
         image_count = sum(image is not None for image in image_slots)
         if image_count == 0:
@@ -1552,6 +1644,7 @@ class ManualRefCollage(io.ComfyNode):
             out_height,
             out_background,
             layout_json,
+            use_layout_size=False,
         )
         return io.NodeOutput(collage, alpha_mask)
 
@@ -1710,11 +1803,19 @@ if PromptServer is not None:
             image_names = list(data.get("images") or [])
             while len(image_names) < 5:
                 image_names.append("")
+            image_enabled = list(data.get("image_enabled") or [])
+            while len(image_enabled) < 5:
+                image_enabled.append(True)
             image_names = [
-                _normalize_media_name(image_names[index]) or _resolve_linked_media_name(prompt_data, node_id, f"image_{index + 1}")
+                ""
+                if not _bool_enabled(image_enabled[index])
+                else _normalize_media_name(image_names[index]) or _resolve_linked_media_name(prompt_data, node_id, f"image_{index + 1}")
                 for index in range(5)
             ]
-            video_name = _normalize_media_name(data.get("video_frame")) or _resolve_linked_media_name(prompt_data, node_id, "video_frame")
+            video_enabled = _bool_enabled(data.get("video_frame_enabled"), True)
+            video_name = (
+                _normalize_media_name(data.get("video_frame")) or _resolve_linked_media_name(prompt_data, node_id, "video_frame")
+            ) if video_enabled else ""
 
             previews = []
             ckpt_name = ""
