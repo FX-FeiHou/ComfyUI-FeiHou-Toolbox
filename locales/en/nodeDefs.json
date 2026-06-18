@@ -1,5 +1,195 @@
 {
-  "InvertBooleanFeiHou": {
+  "SCAIL2ColoredMaskV2": {
+    "display_name": "Create SCAIL-2 Colored Mask V2",
+    "inputs": {
+      "driving_track_data": {
+        "name": "driving track data",
+        "tooltip": "SAM3 track of the driving pose video. Will be rendered into the pose_video_mask output."
+      },
+      "ref_track_data": {
+        "name": "reference track data",
+        "tooltip": "SAM3 track of the reference image."
+      },
+      "prefix_track_data": {
+        "name": "prefix track data",
+        "tooltip": "SAM3 track of a prefix image batch. The first 5 frames are rendered into prefix_image_mask."
+      },
+      "object_indices": {
+        "name": "object indices",
+        "tooltip": "Comma-separated list of person indices to include. Empty = all."
+      },
+      "sort_by": {
+        "name": "sort by",
+        "tooltip": "Order in which palette colors are assigned to tracked objects."
+      },
+      "prefix_mask_mode": {
+        "name": "prefix mask mode",
+        "tooltip": "Controls how colors are assigned to the prefix image mask batch."
+      },
+      "replacement_mode": {
+        "name": "replacement mode",
+        "tooltip": "False = animation mode. True = replacement mode."
+      },
+      "render_device": {
+        "name": "render device",
+        "tooltip": "Device used to render the RGB mask tensors."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "pose video mask"
+      },
+      "1": {
+        "name": "reference image mask"
+      },
+      "2": {
+        "name": "prefix image mask"
+      }
+    }
+  },
+  "AutoRefCollage": {
+    "display_name": "Auto Ref Collage",
+    "inputs": {
+      "model": {
+        "name": "model",
+        "tooltip": "SAM3/SAM3.1 model from CheckpointLoaderSimple."
+      },
+      "clip": {
+        "name": "clip",
+        "tooltip": "SAM3/SAM3.1 CLIP from CheckpointLoaderSimple."
+      },
+      "image_1": {
+        "name": "image_1"
+      },
+      "image_2": {
+        "name": "image_2"
+      },
+      "image_3": {
+        "name": "image_3"
+      },
+      "image_4": {
+        "name": "image_4"
+      },
+      "image_5": {
+        "name": "image_5"
+      },
+      "prompt": {
+        "name": "prompt",
+        "tooltip": "Text prompt used internally for SAM3 detection."
+      },
+      "width": {
+        "name": "width",
+        "tooltip": "Output collage width."
+      },
+      "height": {
+        "name": "height",
+        "tooltip": "Output collage height."
+      },
+      "detection_threshold": {
+        "name": "detection threshold",
+        "tooltip": "SAM3 mask threshold after segmentation."
+      },
+      "background": {
+        "name": "background",
+        "tooltip": "Background color for the RGB collage image output."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "collage"
+      },
+      "1": {
+        "name": "alpha mask"
+      }
+    }
+  },
+  "ManualRefCollage": {
+    "display_name": "Manual Ref Collage",
+    "inputs": {
+      "model": {
+        "name": "model",
+        "tooltip": "SAM3/SAM3.1 model from CheckpointLoaderSimple."
+      },
+      "clip": {
+        "name": "clip",
+        "tooltip": "SAM3/SAM3.1 CLIP from CheckpointLoaderSimple."
+      },
+      "image_1": {
+        "name": "image_1"
+      },
+      "image_2": {
+        "name": "image_2"
+      },
+      "image_3": {
+        "name": "image_3"
+      },
+      "image_4": {
+        "name": "image_4"
+      },
+      "image_5": {
+        "name": "image_5"
+      },
+      "video_frame": {
+        "name": "video frame"
+      },
+      "prompt": {
+        "name": "prompt",
+        "tooltip": "Text prompt used internally for SAM3 detection."
+      },
+      "layout_json": {
+        "name": "layout JSON",
+        "tooltip": "Internal manual collage layout saved by the node UI."
+      },
+      "width": {
+        "name": "width",
+        "tooltip": "Output collage width."
+      },
+      "height": {
+        "name": "height",
+        "tooltip": "Output collage height."
+      },
+      "detection_threshold": {
+        "name": "detection threshold",
+        "tooltip": "SAM3 mask threshold after segmentation."
+      },
+      "background_opacity": {
+        "name": "background opacity",
+        "tooltip": "Background video frame opacity."
+      },
+      "background": {
+        "name": "background",
+        "tooltip": "Background color for the RGB collage image output."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "collage"
+      },
+      "1": {
+        "name": "alpha mask"
+      }
+    }
+  },
+  "ComfySwitchNodeV2": {
+    "display_name": "Switch V2",
+    "inputs": {
+      "switch": {
+        "name": "switch"
+      },
+      "on_false": {
+        "name": "false"
+      },
+      "on_true": {
+        "name": "true"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "output"
+      }
+    }
+  },
+  "InvertBoolean": {
     "display_name": "Invert Boolean",
     "inputs": {
       "boolean": {
@@ -10,6 +200,41 @@
     "outputs": {
       "0": {
         "name": "boolean"
+      }
+    }
+  },
+  "ImageBatchMultiV2": {
+    "display_name": "Image Batch Multi V2",
+    "inputs": {
+      "inputcount": {
+        "name": "input count"
+      },
+      "image_1": {
+        "name": "image_1"
+      },
+      "image_2": {
+        "name": "image_2"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "images"
+      }
+    }
+  },
+  "FastGroupsBypassSwitch": {
+    "display_name": "Fast Groups Bypass Switch",
+    "inputs": {
+      "input1": {
+        "name": "input1"
+      },
+      "input2": {
+        "name": "input2"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "output"
       }
     }
   }

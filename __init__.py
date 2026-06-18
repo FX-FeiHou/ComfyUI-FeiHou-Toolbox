@@ -1971,13 +1971,13 @@ class ComfySwitchNodeV2(io.ComfyNode):
         return io.NodeOutput(on_false)
 
 
-class InvertBooleanFeiHou(io.ComfyNode):
+class InvertBoolean(io.ComfyNode):
     """Invert a BOOLEAN value from nodes such as PrimitiveBoolean."""
 
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="InvertBooleanFeiHou",
+            node_id="InvertBoolean",
             display_name="Invert Boolean",
             category="utilities/logic",
             search_aliases=["反转布尔值", "invert boolean", "not", "toggle", "negate", "flip boolean"],
@@ -1997,6 +1997,73 @@ class InvertBooleanFeiHou(io.ComfyNode):
     @classmethod
     def execute(cls, boolean: bool) -> io.NodeOutput:
         return io.NodeOutput(not boolean)
+
+
+class ImageBatchMultiV2(io.ComfyNode):
+    """KJNodes ImageBatchMulti variant that skips missing inputs instead of outputting black frames."""
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="ImageBatchMultiV2",
+            display_name="Image Batch Multi V2",
+            category="image/batch",
+            description=(
+                "Creates an image batch from multiple image inputs. "
+                "Unlike KJNodes ImageBatchMulti, missing or bypassed inputs are skipped instead of being replaced by black frames."
+            ),
+            search_aliases=["图像组合批次（多重）V2", "image batch multi v2", "image batch multi", "combine image batch multi"],
+            accept_all_inputs=True,
+            inputs=[
+                io.Int.Input("inputcount", default=2, min=2, max=1000, step=1),
+                io.Image.Input("image_1", optional=True),
+                io.Image.Input("image_2", optional=True),
+            ],
+            outputs=[
+                io.Image.Output("images", display_name="images"),
+            ],
+        )
+
+    @staticmethod
+    def _valid_image(value):
+        return isinstance(value, torch.Tensor) and value.ndim == 4 and value.shape[0] > 0
+
+    @classmethod
+    def execute(cls, inputcount: int, image_1=None, image_2=None, **kwargs) -> io.NodeOutput:
+        kwargs["image_1"] = image_1
+        kwargs["image_2"] = image_2
+        images = [
+            kwargs.get(f"image_{index}")
+            for index in range(1, int(inputcount) + 1)
+            if cls._valid_image(kwargs.get(f"image_{index}"))
+        ]
+        if not images:
+            return io.NodeOutput(None)
+
+        first = images[0]
+        h, w = first.shape[1], first.shape[2]
+        max_ch = max(image.shape[-1] for image in images)
+        total_frames = sum(image.shape[0] for image in images)
+
+        out = torch.empty((total_frames, h, w, max_ch), dtype=first.dtype, device=first.device)
+        offset = 0
+        for image in images:
+            if image.shape[1:3] != (h, w):
+                image = comfy.utils.common_upscale(
+                    image.movedim(-1, 1),
+                    w,
+                    h,
+                    "bilinear",
+                    "center",
+                ).movedim(1, -1)
+            if image.shape[-1] < max_ch:
+                image = F.pad(image, (0, max_ch - image.shape[-1]), mode="constant", value=1.0)
+
+            n = image.shape[0]
+            out[offset:offset + n].copy_(image.to(device=out.device, dtype=out.dtype), non_blocking=True)
+            offset += n
+
+        return io.NodeOutput(out.cpu())
 
 
 class FastGroupsBypassSwitch(io.ComfyNode):
@@ -2171,7 +2238,8 @@ class FeiHouToolboxExtension(ComfyExtension):
             AutoRefCollage,
             ManualRefCollage,
             ComfySwitchNodeV2,
-            InvertBooleanFeiHou,
+            InvertBoolean,
+            ImageBatchMultiV2,
             FastGroupsBypassSwitch,
         ]
 

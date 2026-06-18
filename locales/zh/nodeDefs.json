@@ -1,5 +1,195 @@
 {
-  "InvertBooleanFeiHou": {
+  "SCAIL2ColoredMaskV2": {
+    "display_name": "创建 SCAIL-2 彩色遮罩 V2",
+    "inputs": {
+      "driving_track_data": {
+        "name": "驱动追踪数据",
+        "tooltip": "驱动姿态视频的 SAM3 追踪数据，会渲染到 pose_video_mask 输出。"
+      },
+      "ref_track_data": {
+        "name": "参考追踪数据",
+        "tooltip": "参考图像的 SAM3 追踪数据。"
+      },
+      "prefix_track_data": {
+        "name": "前缀追踪数据",
+        "tooltip": "前缀图像批次的 SAM3 追踪数据，前 5 帧会渲染到 prefix_image_mask。"
+      },
+      "object_indices": {
+        "name": "对象序号",
+        "tooltip": "要保留的人物序号，用英文逗号分隔；留空表示全部。"
+      },
+      "sort_by": {
+        "name": "排序方式",
+        "tooltip": "为追踪对象分配调色板颜色时使用的排序方式。"
+      },
+      "prefix_mask_mode": {
+        "name": "前缀遮罩模式",
+        "tooltip": "控制前缀图像遮罩批次的颜色分配方式。"
+      },
+      "replacement_mode": {
+        "name": "替换模式",
+        "tooltip": "关闭为动画模式，开启为替换模式。"
+      },
+      "render_device": {
+        "name": "渲染设备",
+        "tooltip": "用于渲染 RGB 遮罩张量的设备。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "姿态视频遮罩"
+      },
+      "1": {
+        "name": "参考图像遮罩"
+      },
+      "2": {
+        "name": "前缀图像遮罩"
+      }
+    }
+  },
+  "AutoRefCollage": {
+    "display_name": "多参图像自动拼接",
+    "inputs": {
+      "model": {
+        "name": "模型",
+        "tooltip": "来自 CheckpointLoaderSimple 的 SAM3/SAM3.1 模型。"
+      },
+      "clip": {
+        "name": "CLIP",
+        "tooltip": "来自 CheckpointLoaderSimple 的 SAM3/SAM3.1 CLIP。"
+      },
+      "image_1": {
+        "name": "图像_1"
+      },
+      "image_2": {
+        "name": "图像_2"
+      },
+      "image_3": {
+        "name": "图像_3"
+      },
+      "image_4": {
+        "name": "图像_4"
+      },
+      "image_5": {
+        "name": "图像_5"
+      },
+      "prompt": {
+        "name": "提示词",
+        "tooltip": "节点内部用于 SAM3 检测的文本提示词。"
+      },
+      "width": {
+        "name": "宽度",
+        "tooltip": "输出拼图宽度。"
+      },
+      "height": {
+        "name": "高度",
+        "tooltip": "输出拼图高度。"
+      },
+      "detection_threshold": {
+        "name": "检测阈值",
+        "tooltip": "SAM3 分割后的遮罩阈值。"
+      },
+      "background": {
+        "name": "背景",
+        "tooltip": "RGB 拼图输出的背景颜色。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "拼图"
+      },
+      "1": {
+        "name": "透明遮罩"
+      }
+    }
+  },
+  "ManualRefCollage": {
+    "display_name": "多参图像手动拼接",
+    "inputs": {
+      "model": {
+        "name": "模型",
+        "tooltip": "来自 CheckpointLoaderSimple 的 SAM3/SAM3.1 模型。"
+      },
+      "clip": {
+        "name": "CLIP",
+        "tooltip": "来自 CheckpointLoaderSimple 的 SAM3/SAM3.1 CLIP。"
+      },
+      "image_1": {
+        "name": "图像_1"
+      },
+      "image_2": {
+        "name": "图像_2"
+      },
+      "image_3": {
+        "name": "图像_3"
+      },
+      "image_4": {
+        "name": "图像_4"
+      },
+      "image_5": {
+        "name": "图像_5"
+      },
+      "video_frame": {
+        "name": "视频帧"
+      },
+      "prompt": {
+        "name": "提示词",
+        "tooltip": "节点内部用于 SAM3 检测的文本提示词。"
+      },
+      "layout_json": {
+        "name": "布局 JSON",
+        "tooltip": "节点 UI 保存的内部手动拼图布局。"
+      },
+      "width": {
+        "name": "宽度",
+        "tooltip": "输出拼图宽度。"
+      },
+      "height": {
+        "name": "高度",
+        "tooltip": "输出拼图高度。"
+      },
+      "detection_threshold": {
+        "name": "检测阈值",
+        "tooltip": "SAM3 分割后的遮罩阈值。"
+      },
+      "background_opacity": {
+        "name": "背景不透明度",
+        "tooltip": "视频帧背景的不透明度。"
+      },
+      "background": {
+        "name": "背景",
+        "tooltip": "RGB 拼图输出的背景颜色。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "拼图"
+      },
+      "1": {
+        "name": "透明遮罩"
+      }
+    }
+  },
+  "ComfySwitchNodeV2": {
+    "display_name": "切换 V2",
+    "inputs": {
+      "switch": {
+        "name": "开关"
+      },
+      "on_false": {
+        "name": "false"
+      },
+      "on_true": {
+        "name": "true"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "输出"
+      }
+    }
+  },
+  "InvertBoolean": {
     "display_name": "反转布尔值",
     "inputs": {
       "boolean": {
@@ -10,6 +200,41 @@
     "outputs": {
       "0": {
         "name": "布尔值"
+      }
+    }
+  },
+  "ImageBatchMultiV2": {
+    "display_name": "图像组合批次（多重）V2",
+    "inputs": {
+      "inputcount": {
+        "name": "输入数量"
+      },
+      "image_1": {
+        "name": "图像_1"
+      },
+      "image_2": {
+        "name": "图像_2"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像"
+      }
+    }
+  },
+  "FastGroupsBypassSwitch": {
+    "display_name": "多框忽略并切换",
+    "inputs": {
+      "input1": {
+        "name": "输入1"
+      },
+      "input2": {
+        "name": "输入2"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "输出"
       }
     }
   }

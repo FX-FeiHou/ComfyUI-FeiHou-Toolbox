@@ -1,8 +1,8 @@
 # ComfyUI-FeiHou-Toolbox
 
-A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, boolean routing, and group-based workflow switching.
+A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.3**.
+Current version: **v2.4**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -31,14 +31,17 @@ After installing or updating, restart ComfyUI and hard-refresh the browser page.
 
 ## Nodes Overview
 
-| Node ID | Display Name | Version |
+Node display titles follow the current ComfyUI language setting. This English README shows the English titles.
+
+| Display Title | Node ID | Version |
 | --- | --- | --- |
-| `SCAIL2ColoredMaskV2` | Create SCAIL-2 Colored Mask V2 | v2.2 |
-| `AutoRefCollage` | 多参图像自动拼接 | v1.0 |
-| `ManualRefCollage` | 多参图像手动拼接 | v2.2.2 |
-| `ComfySwitchNodeV2` | Switch V2 | v2.0 |
-| `InvertBooleanFeiHou` | Invert Boolean | v2.3 |
-| `FastGroupsBypassSwitch` | 多框忽略并切换 | v2.0 |
+| Create SCAIL-2 Colored Mask V2 | `SCAIL2ColoredMaskV2` | v2.2 |
+| Auto Ref Collage | `AutoRefCollage` | v1.0 |
+| Manual Ref Collage | `ManualRefCollage` | v2.2.2 |
+| Switch V2 | `ComfySwitchNodeV2` | v2.0 |
+| Invert Boolean | `InvertBoolean` | v2.3 |
+| Image Batch Multi V2 | `ImageBatchMultiV2` | v2.4 |
+| Fast Groups Bypass Switch | `FastGroupsBypassSwitch` | v2.0 |
 
 ### Create SCAIL-2 Colored Mask V2
 
@@ -50,11 +53,11 @@ An enhanced version of ComfyUI's original SCAIL-2 colored mask node, built for m
 - `Multi Image Multi Color`: each output batch image uses the node's object color palette rule.
 - `Single Image Multi Color`: output batch images use batch-order colors: blue, red, green, magenta, cyan, then loop after 5 images.
 
-### AutoRefCollage
+### Auto Ref Collage
 
 Automatically uses SAM3/SAM3.1 to cut people out from multiple reference images and compose them into a single multi-person reference collage.
 
-### ManualRefCollage (多参图像手动拼接, v2.2.2)
+### Manual Ref Collage (v2.2.2)
 
 A manual collage node that loads SAM3/SAM3.1 cutouts onto an editable canvas, allowing users to adjust position and scale before outputting the final composed image.
 
@@ -66,7 +69,11 @@ A revised switch node for toggling between two workflow paths while reducing iss
 
 An input-only boolean node that inverts `true` to `false` and `false` to `true`. It is compatible with `PrimitiveBoolean` output chains.
 
-### FastGroupsBypassSwitch (多框忽略并切换, v2.0)
+### Image Batch Multi V2
+
+A copy-style variant of KJNodes `ImageBatchMulti` for creating a batch from multiple image inputs. It keeps the dynamic input-count workflow, but skips missing or bypassed image inputs instead of adding black placeholder frames. If no image input is available, it returns no image output.
+
+### Fast Groups Bypass Switch (v2.0)
 
 A group bypass and switch node that binds two ComfyUI Groups, switches which group is active, bypasses the inactive group, and outputs the corresponding input.
 
@@ -74,12 +81,17 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 
 ## Changelog
 
+### v2.4
+
+- Added `ImageBatchMultiV2` (`Image Batch Multi V2` / `图像组合批次（多重）V2`), based on KJNodes `ImageBatchMulti`.
+- Kept the original dynamic `inputcount` and `Update inputs` workflow.
+- Changed missing-input handling: unconnected or bypassed image inputs are skipped instead of being replaced by black frames.
+- If no image inputs are available, the node returns no image output.
+
 ### v2.3
 
-- Added `InvertBooleanFeiHou` (`Invert Boolean` / `反转布尔值`), a single-input single-output boolean inverter.
+- Added `InvertBoolean` (`Invert Boolean` / `反转布尔值`), a single-input single-output boolean inverter.
 - The node is compatible with `PrimitiveBoolean` output chains and flips `true` to `false`, `false` to `true`.
-- Added language-aware node title display so the new node shows either Chinese or English in the title bar, not both.
-- Added localized node definition entries under `locales/en` and `locales/zh`.
 
 ### v2.2.2
 
