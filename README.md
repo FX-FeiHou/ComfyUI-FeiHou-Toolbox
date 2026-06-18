@@ -1,8 +1,8 @@
 # ComfyUI-FeiHou-Toolbox
 
-A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, and group-based workflow switching.
+A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, boolean routing, and group-based workflow switching.
 
-Current version: **v2.2.2**.
+Current version: **v2.3**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -37,6 +37,7 @@ After installing or updating, restart ComfyUI and hard-refresh the browser page.
 | `AutoRefCollage` | 多参图像自动拼接 | v1.0 |
 | `ManualRefCollage` | 多参图像手动拼接 | v2.2.2 |
 | `ComfySwitchNodeV2` | Switch V2 | v2.0 |
+| `InvertBooleanFeiHou` | Invert Boolean | v2.3 |
 | `FastGroupsBypassSwitch` | 多框忽略并切换 | v2.0 |
 
 ### Create SCAIL-2 Colored Mask V2
@@ -61,6 +62,10 @@ A manual collage node that loads SAM3/SAM3.1 cutouts onto an editable canvas, al
 
 A revised switch node for toggling between two workflow paths while reducing issues caused by inactive branches.
 
+### Invert Boolean
+
+An input-only boolean node that inverts `true` to `false` and `false` to `true`. It is compatible with `PrimitiveBoolean` output chains.
+
 ### FastGroupsBypassSwitch (多框忽略并切换, v2.0)
 
 A group bypass and switch node that binds two ComfyUI Groups, switches which group is active, bypasses the inactive group, and outputs the corresponding input.
@@ -68,6 +73,13 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.3
+
+- Added `InvertBooleanFeiHou` (`Invert Boolean` / `反转布尔值`), a single-input single-output boolean inverter.
+- The node is compatible with `PrimitiveBoolean` output chains and flips `true` to `false`, `false` to `true`.
+- Added language-aware node title display so the new node shows either Chinese or English in the title bar, not both.
+- Added localized node definition entries under `locales/en` and `locales/zh`.
 
 ### v2.2.2
 

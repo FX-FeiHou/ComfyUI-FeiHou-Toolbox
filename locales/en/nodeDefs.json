@@ -1,0 +1,16 @@
+{
+  "InvertBooleanFeiHou": {
+    "display_name": "Invert Boolean",
+    "inputs": {
+      "boolean": {
+        "name": "boolean",
+        "tooltip": "BOOLEAN input to invert."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "boolean"
+      }
+    }
+  }
+}

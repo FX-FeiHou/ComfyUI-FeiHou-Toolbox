@@ -1971,6 +1971,34 @@ class ComfySwitchNodeV2(io.ComfyNode):
         return io.NodeOutput(on_false)
 
 
+class InvertBooleanFeiHou(io.ComfyNode):
+    """Invert a BOOLEAN value from nodes such as PrimitiveBoolean."""
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="InvertBooleanFeiHou",
+            display_name="Invert Boolean",
+            category="utilities/logic",
+            search_aliases=["反转布尔值", "invert boolean", "not", "toggle", "negate", "flip boolean"],
+            inputs=[
+                io.Boolean.Input(
+                    "boolean",
+                    display_name="boolean",
+                    force_input=True,
+                    tooltip="BOOLEAN input to invert.",
+                ),
+            ],
+            outputs=[
+                io.Boolean.Output("boolean", display_name="boolean"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, boolean: bool) -> io.NodeOutput:
+        return io.NodeOutput(not boolean)
+
+
 class FastGroupsBypassSwitch(io.ComfyNode):
     """Two-route switch node that also drives workflow group bypass/enable state from the frontend."""
 
@@ -2143,6 +2171,7 @@ class FeiHouToolboxExtension(ComfyExtension):
             AutoRefCollage,
             ManualRefCollage,
             ComfySwitchNodeV2,
+            InvertBooleanFeiHou,
             FastGroupsBypassSwitch,
         ]
 

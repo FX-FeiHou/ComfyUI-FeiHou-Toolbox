@@ -1,0 +1,16 @@
+{
+  "InvertBooleanFeiHou": {
+    "display_name": "反转布尔值",
+    "inputs": {
+      "boolean": {
+        "name": "布尔值",
+        "tooltip": "要反转的 BOOLEAN 输入。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "布尔值"
+      }
+    }
+  }
+}
