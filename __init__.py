@@ -681,7 +681,8 @@ def _encode_sam3_prompt(clip, prompt):
     if not prompt or not prompt.strip():
         prompt = "person"
     tokens = clip.tokenize(prompt)
-    return clip.encode_from_tokens_scheduled(tokens)
+    with torch.no_grad():
+        return clip.encode_from_tokens_scheduled(tokens)
 
 
 def _extract_sam3_prompt(conditioning, device, dtype):
@@ -733,9 +734,9 @@ def _refine_detector_mask(sam3_model, orig_image_hwc, coarse_mask, box_xyxy, hei
             align_corners=False,
         )[0, 0]
 
-    mask_logit = coarse_mask[..., my1:my2, mx1:mx2].unsqueeze(0).unsqueeze(0)
+    mask_logit = coarse_mask[..., my1:my2, mx1:mx2].detach().unsqueeze(0).unsqueeze(0)
     for _ in range(2):
-        coarse_input = F.interpolate(mask_logit, size=(1008, 1008), mode="bilinear", align_corners=False)
+        coarse_input = F.interpolate(mask_logit.detach(), size=(1008, 1008), mode="bilinear", align_corners=False)
         mask_logit = sam3_model.forward_segment(crop_frame, mask_inputs=coarse_input)
 
     refined_crop = F.interpolate(mask_logit, size=(crop_h, crop_w), mode="bilinear", align_corners=False)
@@ -756,51 +757,55 @@ def _segment_person_with_sam3(model, image, prompt, conditioning, threshold):
     device = comfy.model_management.get_torch_device()
     dtype = model.model.get_dtype()
     sam3_model = model.model.diffusion_model
-    text_embeddings, text_mask = _extract_sam3_prompt(conditioning, device, dtype)
+    with torch.no_grad():
+        text_embeddings, text_mask = _extract_sam3_prompt(conditioning, device, dtype)
 
-    image_in = comfy.utils.common_upscale(
-        image[..., :3].movedim(-1, 1),
-        1008,
-        1008,
-        "bilinear",
-        crop="disabled",
-    )
-    frame = image_in.to(device=device, dtype=dtype)
-    results = sam3_model(
-        frame,
-        text_embeddings=text_embeddings,
-        text_mask=text_mask,
-        threshold=threshold,
-        orig_size=(height, width),
-    )
-    scores = results["scores"][0].sigmoid()
-    masks = results["masks"][0]
-    boxes = results["boxes"][0]
-    keep = scores > threshold
-    if not keep.any():
-        LOGGER.warning(
-            "AutoRefCollage: SAM3 found no object for prompt %r at threshold %.2f; using background fallback.",
-            prompt,
-            threshold,
+        image_in = comfy.utils.common_upscale(
+            image[..., :3].movedim(-1, 1),
+            1008,
+            1008,
+            "bilinear",
+            crop="disabled",
         )
-        return _fallback_person_alpha(image).to(image.device)
+        frame = image_in.to(device=device, dtype=dtype)
+        results = sam3_model(
+            frame,
+            text_embeddings=text_embeddings,
+            text_mask=text_mask,
+            threshold=threshold,
+            orig_size=(height, width),
+        )
+        scores = results["scores"][0].sigmoid()
+        masks = results["masks"][0]
+        boxes = results["boxes"][0]
+        keep = scores > threshold
+        if not keep.any():
+            LOGGER.warning(
+                "AutoRefCollage: SAM3 found no object for prompt %r at threshold %.2f; using background fallback.",
+                prompt,
+                threshold,
+            )
+            return _fallback_person_alpha(image).to(image.device)
 
-    keep_scores = scores[keep]
-    best_local = int(keep_scores.argmax().item())
-    keep_indices = torch.nonzero(keep, as_tuple=False).flatten()
-    best = int(keep_indices[best_local].item())
-    mask = _refine_detector_mask(
-        sam3_model,
-        image[0].to(device=device, dtype=dtype),
-        masks[best],
-        boxes[best],
-        height,
-        width,
-        device,
-        dtype,
-    )
-    mask = (mask > 0).float()
-    return _soften_alpha(mask, blur_radius=2)
+        keep_scores = scores[keep]
+        best_local = int(keep_scores.argmax().item())
+        keep_indices = torch.nonzero(keep, as_tuple=False).flatten()
+        best = int(keep_indices[best_local].item())
+        coarse_mask = masks[best].detach().clone()
+        box_xyxy = boxes[best].detach().clone()
+        del results, scores, masks, boxes, keep, keep_scores, keep_indices, frame, image_in, text_embeddings, text_mask
+        mask = _refine_detector_mask(
+            sam3_model,
+            image[0],
+            coarse_mask,
+            box_xyxy,
+            height,
+            width,
+            device,
+            dtype,
+        )
+        mask = (mask > 0).float()
+        return _soften_alpha(mask, blur_radius=2)
 
 
 def _fallback_person_alpha(image):

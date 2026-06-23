@@ -81,6 +81,12 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 
 ## Changelog
 
+### v2.5
+
+- Optimized SAM3/SAM3.1 cutout memory usage in `AutoRefCollage` and `ManualRefCollage`.
+- Wrapped CLIP prompt encoding and SAM3 inference in `torch.no_grad()` to avoid retaining inference graphs during preview loading and workflow execution.
+- Reduced the matched-object refinement peak by keeping only the best mask/box before refinement and avoiding a full original-image GPU copy before cropping.
+
 ### v2.4
 
 - Added `ImageBatchMultiV2` (`Image Batch Multi V2` / `图像组合批次（多重）V2`), based on KJNodes `ImageBatchMulti`.
