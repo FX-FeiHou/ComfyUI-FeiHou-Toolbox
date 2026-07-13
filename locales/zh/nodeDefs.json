@@ -32,7 +32,7 @@
       },
       "render_device": {
         "name": "渲染设备",
-        "tooltip": "用于渲染 RGB 遮罩张量的设备。"
+        "tooltip": "gpu 使用显卡渲染，速度更快但占用显存；cpu 将遮罩渲染卸载到系统内存，可降低显存占用。"
       }
     },
     "outputs": {

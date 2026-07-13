@@ -2,7 +2,7 @@
 
 ComfyUI 自定义节点工具箱，主要围绕多图参考、SAM3/SAM3.1 人物抠图拼接、SCAIL-2 遮罩处理、图像批次处理、布尔值传递，以及工作流分组切换进行扩展。
 
-当前版本为 **v2.4**。
+当前版本为 **v2.6**。
 其中 **多参图像手动拼接** 的最新版本为 **v2.2.2**。
 
 <p align="right">
@@ -35,7 +35,7 @@ git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git
 
 | 节点标题 | 节点注册名 | 版本 |
 | --- | --- | --- |
-| 创建 SCAIL-2 彩色遮罩 V2 | `SCAIL2ColoredMaskV2` | v2.2 |
+| 创建 SCAIL-2 彩色遮罩 V2 | `SCAIL2ColoredMaskV2` | v2.6 |
 | 多参图像自动拼接 | `AutoRefCollage` | v1.0 |
 | 多参图像手动拼接 | `ManualRefCollage` | v2.2.2 |
 | 切换 V2 | `ComfySwitchNodeV2` | v2.0 |
@@ -52,6 +52,11 @@ git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git
 - `Multi Image Single Color`：输出批次中每张图都是单色，颜色与 `reference_image_mask` 接口当前前景颜色保持一致。
 - `Multi Image Multi Color`：输出批次中每张图都按节点对象调色板规则输出彩色遮罩。
 - `Single Image Multi Color`：输出批次图按批次顺序分别为蓝、红、绿、洋红、青，超过 5 张后循环。
+
+`render_device` 支持：
+
+- `gpu`：在显卡上渲染遮罩，速度更快，但会占用显存。
+- `cpu`：将遮罩渲染卸载到系统内存，显著降低显存占用，但处理速度较慢。
 
 ### 多参图像自动拼接（AutoRefCollage）
 
@@ -80,6 +85,10 @@ Switch 节点的改版，用于在两条路径之间切换，并减少未启用�
 ---
 
 ## 版本记录
+
+### v2.6
+
+- 修改渲染设备为 `gpu` 和 `cpu` 两个选项，默认使用 `gpu`；如果长视频爆显存，请手动改为 `cpu`。
 
 ### v2.5
 

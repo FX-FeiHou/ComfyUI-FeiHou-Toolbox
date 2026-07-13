@@ -1393,12 +1393,12 @@ def _background_rgb(background):
     return (1.0, 1.0, 1.0) if background.startswith("white") else (0.0, 0.0, 0.0)
 
 
-def _render_device(render_device="auto"):
+def _render_device(render_device="gpu"):
     if render_device == "cpu":
         return torch.device("cpu")
-    if render_device in ("auto", "gpu"):
-        return comfy.model_management.get_torch_device()
-    return comfy.model_management.intermediate_device()
+    # Keep legacy "auto" workflows on the former GPU path while exposing only
+    # the explicit GPU / CPU choices in the node UI.
+    return comfy.model_management.get_torch_device()
 
 
 def _render_dtype(device):
@@ -1414,7 +1414,7 @@ def _has_any_mask(packed, device):
     return bool(unpack_masks(packed.to(device)).any().item())
 
 
-def _blank_images(frame_count, height, width, background, render_device="auto"):
+def _blank_images(frame_count, height, width, background, render_device="gpu"):
     device = _render_device(render_device)
     dtype = _render_dtype(device)
     bg_rgb = _background_rgb(background)
@@ -1423,7 +1423,7 @@ def _blank_images(frame_count, height, width, background, render_device="auto"):
     return out
 
 
-def _render_colored_masks(track_data, background="black", render_device="auto"):
+def _render_colored_masks(track_data, background="black", render_device="gpu"):
     packed = track_data["packed_masks"]
     height, width = track_data["orig_size"]
     device = _render_device(render_device)
@@ -1458,7 +1458,7 @@ def _render_prefix_image_masks(
     background="white",
     prefix_mask_mode="Multi Image Single Color",
     max_images=5,
-    render_device="auto",
+    render_device="gpu",
 ):
     packed = track_data["packed_masks"]
     height, width = track_data["orig_size"]
@@ -1563,9 +1563,9 @@ class SCAIL2ColoredMaskV2(io.ComfyNode):
                 ),
                 io.Combo.Input(
                     "render_device",
-                    options=["auto", "gpu", "cpu"],
-                    default="auto",
-                    tooltip="Device used to render the RGB mask tensors. auto/gpu uses ComfyUI's current torch device; cpu uses system memory.",
+                    options=["gpu", "cpu"],
+                    default="gpu",
+                    tooltip="gpu renders masks on the graphics card for speed. cpu offloads mask rendering to system memory to reduce VRAM use.",
                 ),
             ],
             outputs=[
@@ -1584,7 +1584,7 @@ class SCAIL2ColoredMaskV2(io.ComfyNode):
         sort_by,
         prefix_mask_mode,
         replacement_mode,
-        render_device="auto",
+        render_device="gpu",
         ref_track_data=None,
         prefix_track_data=None,
     ) -> io.NodeOutput:

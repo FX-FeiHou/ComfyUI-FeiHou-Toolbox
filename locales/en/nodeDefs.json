@@ -32,7 +32,7 @@
       },
       "render_device": {
         "name": "render device",
-        "tooltip": "Device used to render the RGB mask tensors."
+        "tooltip": "gpu renders on the graphics card for speed and uses VRAM; cpu offloads mask rendering to system memory to reduce VRAM use."
       }
     },
     "outputs": {

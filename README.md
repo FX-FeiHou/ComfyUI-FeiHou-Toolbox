@@ -2,7 +2,7 @@
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.4**.
+Current version: **v2.6**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -35,7 +35,7 @@ Node display titles follow the current ComfyUI language setting. This English RE
 
 | Display Title | Node ID | Version |
 | --- | --- | --- |
-| Create SCAIL-2 Colored Mask V2 | `SCAIL2ColoredMaskV2` | v2.2 |
+| Create SCAIL-2 Colored Mask V2 | `SCAIL2ColoredMaskV2` | v2.6 |
 | Auto Ref Collage | `AutoRefCollage` | v1.0 |
 | Manual Ref Collage | `ManualRefCollage` | v2.2.2 |
 | Switch V2 | `ComfySwitchNodeV2` | v2.0 |
@@ -52,6 +52,11 @@ An enhanced version of ComfyUI's original SCAIL-2 colored mask node, built for m
 - `Multi Image Single Color`: each output batch image is single-color, matching the current `reference_image_mask` foreground color.
 - `Multi Image Multi Color`: each output batch image uses the node's object color palette rule.
 - `Single Image Multi Color`: output batch images use batch-order colors: blue, red, green, magenta, cyan, then loop after 5 images.
+
+`render_device` supports:
+
+- `gpu`: renders masks on the graphics card for speed, using VRAM.
+- `cpu`: offloads mask rendering to system memory to reduce VRAM use, at a slower speed.
 
 ### Auto Ref Collage
 
@@ -80,6 +85,10 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.6
+
+- Changed the render device to `gpu` and `cpu` options. `gpu` is the default; if a long video runs out of VRAM, manually switch to `cpu`.
 
 ### v2.5
 
