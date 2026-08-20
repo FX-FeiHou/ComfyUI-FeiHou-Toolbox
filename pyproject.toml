@@ -15,5 +15,5 @@ Documentation = "https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox#readme"
 "Bug Tracker" = "https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox/issues"
 
 [tool.comfy]
-PublisherId = "FX-FeiHou"
+PublisherId = "fx-feihou"
 DisplayName = "ComfyUI-FeiHou-Toolbox"
