@@ -24,7 +24,9 @@ import base64
 import json
 import logging
 import os
+import random
 import re
+import threading
 from io import BytesIO
 
 from typing_extensions import override
@@ -36,12 +38,15 @@ from PIL import Image, ImageOps, ImageSequence
 from aiohttp import web
 
 import comfy.model_management
+import comfy.sample
 import comfy.sd
 import comfy.utils
 import folder_paths
 import nodes as comfy_nodes
 from comfy_api.latest import ComfyExtension, io
 from comfy.ldm.sam3.tracker import unpack_masks
+
+from .video_combine_v2 import VideoCombineV2
 
 try:
     from server import PromptServer
@@ -60,6 +65,15 @@ MEDIA_EXTENSIONS = {
     ".mp4", ".mov", ".m4v", ".avi", ".webm", ".mkv",
 }
 INACTIVE_NODE_MODES = {2, 4}
+RANDOM_SEED_LIMIT = 1125899906842624
+
+# Keep this node's random sequence isolated from extensions that use Python's
+# module-level PRNG (the same approach used by rgthree's Seed node).
+_initial_random_state = random.getstate()
+random.seed()
+_random_seed_state = random.getstate()
+random.setstate(_initial_random_state)
+_random_seed_lock = threading.Lock()
 
 
 # Model was trained on these exact colors; deviating degrades multi-identity quality.
@@ -2167,6 +2181,102 @@ class FastGroupsBypassSwitch(io.ComfyNode):
         return io.NodeOutput(input2)
 
 
+def _new_random_seed():
+    """Return a positive seed without changing the global Python random state."""
+    global _random_seed_state
+    with _random_seed_lock:
+        previous_state = random.getstate()
+        try:
+            random.setstate(_random_seed_state)
+            seed = random.randint(1, RANDOM_SEED_LIMIT)
+            _random_seed_state = random.getstate()
+            return seed
+        finally:
+            random.setstate(previous_state)
+
+
+def _store_generated_seed(seed, original_seed, prompt=None, extra_pnginfo=None, unique_id=None):
+    """Persist API-generated special seeds in ComfyUI's prompt and workflow metadata."""
+    if unique_id is None:
+        return
+
+    prompt_node = _resolve_prompt_node(prompt, unique_id)
+    if isinstance(prompt_node, dict):
+        inputs = prompt_node.get("inputs")
+        if isinstance(inputs, dict) and "seed" in inputs:
+            inputs["seed"] = seed
+
+    workflow = (extra_pnginfo or {}).get("workflow") if isinstance(extra_pnginfo, dict) else None
+    workflow_node = _workflow_node_by_id(workflow, unique_id)
+    widget_values = workflow_node.get("widgets_values") if isinstance(workflow_node, dict) else None
+    if isinstance(widget_values, list):
+        for index, value in enumerate(widget_values):
+            if value == original_seed:
+                widget_values[index] = seed
+                break
+
+
+class _RandomSeedNoise:
+    """Standard ComfyUI NOISE provider, equivalent to RandomNoise's implementation."""
+
+    def __init__(self, seed):
+        self.seed = int(seed)
+
+    def generate_noise(self, input_latent):
+        latent_image = input_latent["samples"]
+        batch_indices = input_latent.get("batch_index")
+        return comfy.sample.prepare_noise(latent_image, self.seed, batch_indices)
+
+
+class RandomSeedNoise(io.ComfyNode):
+    """rgthree-style seed controls that output NOISE for SamplerCustomAdvanced."""
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="RandomSeedNoise",
+            display_name="Random Seed Noise",
+            category="model/sampling/noise",
+            description=(
+                "Creates a standard NOISE source for SamplerCustomAdvanced with rgthree-style "
+                "random, fixed-random, and last-queued seed controls."
+            ),
+            search_aliases=["随机种子噪波", "random seed noise", "seed noise", "random noise"],
+            inputs=[
+                io.Int.Input(
+                    "seed",
+                    default=-1,
+                    min=-RANDOM_SEED_LIMIT,
+                    max=RANDOM_SEED_LIMIT,
+                    tooltip="-1 randomizes each queue; -2 increments and -3 decrements the last queued seed.",
+                ),
+            ],
+            outputs=[io.Noise.Output("noise")],
+            hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo, io.Hidden.unique_id],
+        )
+
+    @classmethod
+    def IS_CHANGED(cls, seed, **_kwargs):
+        # API callers may submit special values directly, so they must not be cached.
+        return _new_random_seed() if int(seed) in (-1, -2, -3) else int(seed)
+
+    @classmethod
+    def execute(cls, seed, prompt=None, extra_pnginfo=None, unique_id=None) -> io.NodeOutput:
+        seed = int(seed)
+        if seed in (-1, -2, -3):
+            # The web UI replaces special values before queueing. This fallback keeps API-only
+            # workflows useful and records the seed so their metadata remains reproducible.
+            original_seed = seed
+            seed = _new_random_seed()
+            _store_generated_seed(seed, original_seed, prompt, extra_pnginfo, unique_id)
+            LOGGER.warning(
+                "RandomSeedNoise received special seed %s from the server; generated %s instead.",
+                original_seed,
+                seed,
+            )
+        return io.NodeOutput(_RandomSeedNoise(seed))
+
+
 if PromptServer is not None:
     @PromptServer.instance.routes.post("/feihou/manual_collage/load")
     async def feihou_manual_collage_load(request):
@@ -2246,6 +2356,8 @@ class FeiHouToolboxExtension(ComfyExtension):
             InvertBoolean,
             ImageBatchMultiV2,
             FastGroupsBypassSwitch,
+            RandomSeedNoise,
+            VideoCombineV2,
         ]
 
 

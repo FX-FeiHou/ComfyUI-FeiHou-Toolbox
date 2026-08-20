@@ -1,0 +1,19 @@
+[project]
+name = "feihou-toolbox"
+version = "2.9.0"
+description = "FeiHou Toolbox custom nodes for ComfyUI, including reference-image, mask, seed-noise, and one-file VHS video saving tools."
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = []
+classifiers = [
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Repository = "https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox"
+Documentation = "https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox#readme"
+"Bug Tracker" = "https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox/issues"
+
+[tool.comfy]
+PublisherId = "FX-FeiHou"
+DisplayName = "ComfyUI-FeiHou-Toolbox"

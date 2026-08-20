@@ -2,7 +2,7 @@
 
 ComfyUI 自定义节点工具箱，主要围绕多图参考、SAM3/SAM3.1 人物抠图拼接、SCAIL-2 遮罩处理、图像批次处理、布尔值传递，以及工作流分组切换进行扩展。
 
-当前版本为 **v2.6**。
+当前版本为 **v2.9.0**。
 其中 **多参图像手动拼接** 的最新版本为 **v2.2.2**。
 
 <p align="right">
@@ -42,6 +42,8 @@ git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git
 | 反转布尔值 | `InvertBoolean` | v2.3 |
 | 图像组合批次（多重）V2 | `ImageBatchMultiV2` | v2.4 |
 | 多框忽略并切换 | `FastGroupsBypassSwitch` | v2.0 |
+| 随机种子噪波 | `RandomSeedNoise` | v2.8 |
+| Video Combine 🎥🅥🅗🅢 V2 | `VideoCombineV2` | v2.9 |
 
 ### 创建 SCAIL-2 彩色遮罩 V2
 
@@ -85,6 +87,16 @@ Switch 节点的改版，用于在两条路径之间切换，并减少未启用�
 ---
 
 ## 版本记录
+
+### v2.9.0
+
+- 新增 `Video Combine 🎥🅥🅗🅢 V2`：完整沿用 VideoHelperSuite Video Combine 的界面、格式预设、VAE/LATENT 处理、日期前缀和预览逻辑。
+- 接入音频后只写出一个最终视频文件；该文件同时包含视频流、音频流，以及 ComfyUI 提示词和工作流元数据。
+- 补全 VideoHelperSuite 的全部格式下拉与随格式变化的动态参数；预览自动静音播放，鼠标悬停时播放声音。
+
+### v2.8
+
+- 新增 `随机种子噪波`：采用 rgthree 风格随机种子操作，输出可供 `SamplerCustomAdvanced` 使用的标准 `NOISE`。
 
 ### v2.6
 

@@ -29,6 +29,10 @@ const TITLE_MAP = {
     en: "Fast Groups Bypass Switch",
     zh: "多框忽略并切换",
   },
+  RandomSeedNoise: {
+    en: "Random Seed Noise",
+    zh: "随机种子噪波",
+  },
 };
 
 function isChineseLocale() {

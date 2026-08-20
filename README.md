@@ -2,7 +2,7 @@
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.6**.
+Current version: **v2.9.0**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -42,6 +42,8 @@ Node display titles follow the current ComfyUI language setting. This English RE
 | Invert Boolean | `InvertBoolean` | v2.3 |
 | Image Batch Multi V2 | `ImageBatchMultiV2` | v2.4 |
 | Fast Groups Bypass Switch | `FastGroupsBypassSwitch` | v2.0 |
+| Random Seed Noise | `RandomSeedNoise` | v2.8 |
+| Video Combine 🎥🅥🅗🅢 V2 | `VideoCombineV2` | v2.9 |
 
 ### Create SCAIL-2 Colored Mask V2
 
@@ -85,6 +87,16 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.9.0
+
+- Added `Video Combine 🎥🅥🅗🅢 V2`, based on VideoHelperSuite's Video Combine interface, format presets, VAE/LATENT handling, date-prefix handling, and preview behavior.
+- When audio is connected, Video Combine V2 writes one final video file containing the video stream, audio stream, and ComfyUI prompt/workflow metadata.
+- Restored the complete VideoHelperSuite format list and per-format dynamic widgets. The preview auto-plays muted and enables audio while hovered.
+
+### v2.8
+
+- Added `RandomSeedNoise`, a rgthree-style random seed controller that outputs standard `NOISE` for `SamplerCustomAdvanced`.
 
 ### v2.6
 

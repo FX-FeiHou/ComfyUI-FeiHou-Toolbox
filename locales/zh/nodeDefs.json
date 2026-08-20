@@ -237,5 +237,40 @@
         "name": "输出"
       }
     }
+  },
+  "RandomSeedNoise": {
+    "display_name": "随机种子噪波",
+    "inputs": {
+      "seed": {
+        "name": "种子",
+        "tooltip": "-1：每次排队随机；-2：以上次排队种子加一；-3：以上次排队种子减一。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "噪波"
+      }
+    }
+  },
+  "VideoCombineV2": {
+    "inputs": {
+      "audio": { "name": "音频", "tooltip": "音频会直接编码进唯一的最终视频文件。" },
+      "images": { "name": "图像" },
+      "meta_batch": { "name": "批次管理" },
+      "vae": { "name": "vae" },
+      "frame_rate": { "name": "帧率" },
+      "loop_count": { "name": "循环次数" },
+      "filename_prefix": { "name": "文件名前缀" },
+      "format": { "name": "格式" },
+      "pix_fmt": { "name": "pix_fmt" },
+      "crf": { "name": "crf" },
+      "save_metadata": { "name": "保存元数据", "tooltip": "请保持开启，以在视频内嵌入提示词和工作流元数据。" },
+      "trim_to_audio": { "name": "修剪音频" },
+      "pingpong": { "name": "Ping-Pong" },
+      "save_output": { "name": "保存到输出文件夹" }
+    },
+    "outputs": {
+      "0": { "name": "视频" }
+    }
   }
 }

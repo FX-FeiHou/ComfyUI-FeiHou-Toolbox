@@ -237,5 +237,40 @@
         "name": "output"
       }
     }
+  },
+  "RandomSeedNoise": {
+    "display_name": "Random Seed Noise",
+    "inputs": {
+      "seed": {
+        "name": "seed",
+        "tooltip": "-1 randomizes each queue; -2 increments and -3 decrements the last queued seed."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "noise"
+      }
+    }
+  },
+  "VideoCombineV2": {
+    "inputs": {
+      "audio": { "name": "audio", "tooltip": "Audio is encoded directly into the single final video file." },
+      "images": { "name": "images" },
+      "meta_batch": { "name": "meta batch" },
+      "vae": { "name": "vae" },
+      "frame_rate": { "name": "frame rate" },
+      "loop_count": { "name": "loop count" },
+      "filename_prefix": { "name": "filename prefix" },
+      "format": { "name": "format" },
+      "pix_fmt": { "name": "pix_fmt" },
+      "crf": { "name": "crf" },
+      "save_metadata": { "name": "save metadata", "tooltip": "Keep enabled to embed prompt and workflow metadata in the video." },
+      "trim_to_audio": { "name": "trim to audio" },
+      "pingpong": { "name": "Ping-Pong" },
+      "save_output": { "name": "save to output directory" }
+    },
+    "outputs": {
+      "0": { "name": "video" }
+    }
   }
 }
