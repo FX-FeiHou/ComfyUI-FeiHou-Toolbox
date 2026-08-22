@@ -8,24 +8,40 @@ import subprocess
 import uuid
 from pathlib import Path
 
+import nodes as comfy_nodes
+import folder_paths
 from comfy.cli_args import args
 from comfy_api.latest import io
 
-# V2 deliberately delegates the entire encode path to the installed original
-# VideoHelperSuite node.  That preserves its formats, VAE batching, batch
-# manager/requeue behavior, counters, and output logic without a reimplementation.
-try:
-    from videohelpersuite.nodes import VideoCombine as _VHSVideoCombine
-    from videohelpersuite.nodes import get_video_formats as _get_video_formats
-except ImportError as exc:  # pragma: no cover - surfaced clearly in ComfyUI
-    raise ImportError(
-        "Video Combine 🎥🅥🅗🅢 V2 requires ComfyUI-VideoHelperSuite, "
-        "because it directly uses the original Video Combine implementation."
-    ) from exc
-
-
 VHSBatchManager = io.Custom("VHS_BatchManager")
 VHSFilenames = io.Custom("VHS_FILENAMES")
+FORMAT_DIRECTORY = Path(__file__).with_name("video_formats")
+
+
+def _original_vhs_class():
+    """Resolve the loaded original node through ComfyUI's stable registry.
+
+    Custom-node package names are dynamic on this ComfyUI build, so importing
+    VideoHelperSuite's internal Python package directly breaks startup.
+    """
+    node_class = comfy_nodes.NODE_CLASS_MAPPINGS.get("VHS_VideoCombine")
+    if node_class is None:
+        raise RuntimeError("Video Combine 🎥🅥🅗🅢 V2 requires the original ComfyUI-VideoHelperSuite node to be installed and loaded.")
+    return node_class
+
+
+def _format_definitions():
+    original = comfy_nodes.NODE_CLASS_MAPPINGS.get("VHS_VideoCombine")
+    if original is not None:
+        config = original.INPUT_TYPES()["required"]["format"]
+        return list(config[0]), copy.deepcopy(config[1]["formats"])
+
+    # Startup fallback used only if ComfyUI happens to load this package before
+    # VideoHelperSuite.  Runtime uses the registered original class above.
+    names = [path.stem for path in FORMAT_DIRECTORY.glob("*.json")]
+    formats = [f"video/{name}" for name in names]
+    widgets = {"image/webp": [["lossless", "BOOLEAN", {"default": True}]]}
+    return formats, widgets
 
 
 def _ffmpeg_path():
@@ -62,7 +78,7 @@ class VideoCombineV2(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         # Use the original VHS format discovery and its widget definitions.
-        ffmpeg_formats, format_widgets = _get_video_formats()
+        ffmpeg_formats, format_widgets = _format_definitions()
         format_widgets["image/webp"] = [["lossless", "BOOLEAN", {"default": True}]]
         return io.Schema(
             node_id="VideoCombineV2",
@@ -139,7 +155,7 @@ class VideoCombineV2(io.ComfyNode):
         # The original temporary silent encode must not remain in output after V2 finishes.
         workflow["extra"]["VHS_KeepIntermediate"] = False
 
-        result = _VHSVideoCombine().combine_video(
+        result = _original_vhs_class()().combine_video(
             images=images,
             frame_rate=frame_rate,
             loop_count=loop_count,
