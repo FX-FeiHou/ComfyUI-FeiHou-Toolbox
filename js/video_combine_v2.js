@@ -78,6 +78,32 @@ function useKVState(nodeType) {
   });
 }
 
+function useVhsNodeBehavior(nodeType, nodeData) {
+  // This is the node-specific portion of VHS.core.js' shared VHS setup.  It
+  // keeps the original Video Combine numeric widgets and dynamic-widget input
+  // configuration instead of substituting ComfyUI defaults.
+  for (const input of Object.values({ ...nodeData.input?.required, ...nodeData.input?.optional })) {
+    if (["INT", "FLOAT"].includes(input[0])) {
+      input[1] ??= {};
+      input[1].widgetType ??= `VHS${input[0]}`;
+    }
+  }
+  chainCallback(nodeType.prototype, "onNodeCreated", function () {
+    const originalAddInput = this.addInput;
+    this.addInput = function (name, type, options) {
+      if (options?.widget) {
+        const widget = this.widgets.find((item) => item.name === name);
+        if (widget?.config) {
+          type = widget.config[0];
+          if (type === "FLOAT") type = "FLOAT,INT";
+          setWidgetConfig(options, widget.config);
+        }
+      }
+      return originalAddInput.apply(this, [name, type, options]);
+    };
+  });
+}
+
 function fitHeight(node) {
   node.setSize([node.size[0], node.computeSize([node.size[0], node.size[1]])[1]]);
   node.graph?.setDirtyCanvas(true);
@@ -380,6 +406,7 @@ app.registerExtension({
   beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData?.name !== NODE_NAME) return;
     useKVState(nodeType);
+    useVhsNodeBehavior(nodeType, nodeData);
     addDateFormatting(nodeType, "filename_prefix");
     chainCallback(nodeType.prototype, "onExecuted", function (message) {
       if (message?.gifs) this.updateParameters(message.gifs[0], true);
