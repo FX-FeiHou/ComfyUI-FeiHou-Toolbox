@@ -477,7 +477,8 @@ function addFormatWidgets(nodeType) {
     }
     let formatWidgetsCount = 0;
     chainCallback(formatWidget, "callback", (value) => {
-      const formats = LiteGraph.registered_node_types[this.type]?.nodeData?.input?.required?.format?.[1]?.formats;
+      const nodeInputs = LiteGraph.registered_node_types[this.type]?.nodeData?.input;
+      const formats = (nodeInputs?.required?.format ?? nodeInputs?.optional?.format)?.[1]?.formats;
       const newWidgets = [];
       if (formats?.[value]) {
         for (const definition of formats[value]) {

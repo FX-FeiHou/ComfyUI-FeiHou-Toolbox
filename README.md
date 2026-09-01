@@ -2,7 +2,7 @@
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.9.3**.
+Current version: **v2.9.4**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -87,6 +87,10 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.9.4
+
+- Made every Video Combine V2 widget input optional with a backend default. A frontend that omits a widget value can no longer fail prompt validation with `Required input is missing: loop_count`.
 
 ### v2.9.3
 

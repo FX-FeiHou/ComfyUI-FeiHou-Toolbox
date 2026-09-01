@@ -67,13 +67,17 @@ class VideoCombineV2(io.ComfyNode):
                 io.Audio.Input("audio", optional=True),
                 VHSBatchManager.Input("meta_batch", display_name="meta_batch", optional=True),
                 io.Vae.Input("vae", optional=True),
-                io.Float.Input("frame_rate", default=8.0, min=1.0, step=1.0, socketless=True),
-                io.Int.Input("loop_count", default=0, min=0, max=100, step=1, socketless=True),
-                io.String.Input("filename_prefix", default="AnimateDiff", socketless=True),
+                # Older/newer ComfyUI frontends do not always serialize custom
+                # numeric widgets.  These must therefore be optional inputs
+                # with Python defaults: a missing widget value is never a
+                # validation error, while a linked value still overrides it.
+                io.Float.Input("frame_rate", default=8.0, min=1.0, step=1.0, optional=True, socketless=True),
+                io.Int.Input("loop_count", default=0, min=0, max=100, step=1, optional=True, socketless=True),
+                io.String.Input("filename_prefix", default="AnimateDiff", optional=True, socketless=True),
                 io.Combo.Input("format", options=["image/gif", "image/webp"] + ffmpeg_formats,
-                               extra_dict={"formats": format_widgets}, socketless=True),
-                io.Boolean.Input("pingpong", default=False, socketless=True),
-                io.Boolean.Input("save_output", default=True, socketless=True),
+                               extra_dict={"formats": format_widgets}, optional=True, socketless=True),
+                io.Boolean.Input("pingpong", default=False, optional=True, socketless=True),
+                io.Boolean.Input("save_output", default=True, optional=True, socketless=True),
             ],
             outputs=[VHSFilenames.Output("Filenames")],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo, io.Hidden.unique_id],
@@ -120,8 +124,9 @@ class VideoCombineV2(io.ComfyNode):
                     pass
 
     @classmethod
-    def execute(cls, images, frame_rate, loop_count, filename_prefix, format, pingpong,
-                save_output, audio=None, meta_batch=None, vae=None, **format_values):
+    def execute(cls, images, frame_rate=8.0, loop_count=0, filename_prefix="AnimateDiff",
+                format="image/gif", pingpong=False, save_output=True, audio=None,
+                meta_batch=None, vae=None, **format_values):
         # The original node writes this PNG solely for its workflow sidecar.
         # Disable it before the original function starts, rather than deleting it later.
         original_extra = cls.hidden.extra_pnginfo or {}
