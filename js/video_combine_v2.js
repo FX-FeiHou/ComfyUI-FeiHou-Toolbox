@@ -266,7 +266,7 @@ function addVideoPreview(nodeType, isInput = true) {
           if (!params.custom_width || !params.custom_height) params.force_size = `${targetWidth}x?`;
           else params.force_size = `${targetWidth}x${targetWidth / (params.custom_width / params.custom_height)}`;
           params.deadline = app.ui.settings.getSettingValue("VHS.AdvancedPreviewsDeadline");
-          this.videoEl.src = api.apiURL(`/vhs/viewvideo?${new URLSearchParams(params)}`);
+          this.videoEl.src = api.apiURL(`/feihou-vhs/viewvideo?${new URLSearchParams(params)}`);
         }
         this.videoEl.hidden = false;
         this.imgEl.hidden = true;
@@ -279,7 +279,7 @@ function addVideoPreview(nodeType, isInput = true) {
       const doQuery = async () => {
         if (!previewWidget?.value?.params?.filename) return;
         try {
-          const response = await fetch(api.apiURL(`/vhs/queryvideo?${new URLSearchParams(previewWidget.value.params)}`));
+          const response = await fetch(api.apiURL(`/feihou-vhs/queryvideo?${new URLSearchParams(previewWidget.value.params)}`));
           previewNode.video_query = await response.json();
         } catch (_) { /* optional VHS video-information endpoint */ }
       };
