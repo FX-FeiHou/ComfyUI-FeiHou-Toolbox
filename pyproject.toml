@@ -1,6 +1,6 @@
 [project]
 name = "feihou-toolbox"
-version = "2.9.2"
+version = "2.9.3"
 description = "FeiHou Toolbox custom nodes for ComfyUI, including reference-image, mask, seed-noise, and one-file VHS video saving tools."
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

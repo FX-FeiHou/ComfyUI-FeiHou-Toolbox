@@ -25,6 +25,113 @@ const convDict = {
   [NODE_NAME]: ["frame_rate", "loop_count", "filename_prefix", "format", "pingpong", "save_output"],
 };
 
+// The original node gets these from VideoHelperSuite's VHS.core.js.  V2 must
+// provide them too: otherwise an installation without VideoHelperSuite turns
+// VHSFLOAT/VHSINT into required sockets, including loop_count.
+function roundVhsNumber(value, precision) {
+  const fixed = Number(value).toFixed(precision);
+  const dot = fixed.indexOf(".");
+  if (dot < 0) return fixed;
+  let end = fixed.length - 1;
+  while (end > dot && fixed[end] === "0") end--;
+  if (end === dot) end--;
+  return fixed.slice(0, end + 1);
+}
+
+function clampVhsNumber(value, options, integer) {
+  let result = Number(value);
+  if (!Number.isFinite(result)) result = options.default ?? 0;
+  if (options.min != null) result = Math.max(options.min, result);
+  if (options.max != null) result = Math.min(options.max, result);
+  if (integer) {
+    const step = options.step ?? 1;
+    const offset = options.mod ?? 0;
+    result = Math.round((result - offset) / step) * step + offset;
+  } else if (options.round) {
+    result = Math.round((result + Number.EPSILON) / options.round) * options.round;
+  }
+  return result;
+}
+
+function drawVhsNumber(ctx, node, widgetWidth, y, height) {
+  const margin = 15;
+  const showText = LiteGraph.vueNodesMode || app.canvas.ds.scale >= (app.canvas.low_quality_zoom_threshold ?? 0.5);
+  ctx.strokeStyle = LiteGraph.WIDGET_OUTLINE_COLOR;
+  ctx.fillStyle = LiteGraph.WIDGET_BGCOLOR;
+  ctx.beginPath();
+  if (showText) ctx.roundRect(margin, y, widgetWidth - margin * 2, height, [height * 0.5]);
+  else ctx.rect(margin, y, widgetWidth - margin * 2, height);
+  ctx.fill();
+  if (!showText) return;
+  if (!this.disabled) ctx.stroke();
+  ctx.fillStyle = LiteGraph.WIDGET_TEXT_COLOR;
+  if (!this.disabled) {
+    ctx.beginPath();
+    ctx.moveTo(margin + 16, y + 5);
+    ctx.lineTo(margin + 6, y + height * 0.5);
+    ctx.lineTo(margin + 16, y + height - 5);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(widgetWidth - margin - 16, y + 5);
+    ctx.lineTo(widgetWidth - margin - 6, y + height * 0.5);
+    ctx.lineTo(widgetWidth - margin - 16, y + height - 5);
+    ctx.fill();
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = LiteGraph.WIDGET_SECONDARY_TEXT_COLOR;
+  ctx.fillText(this.label || this.name, margin * 2 + 5, y + height * 0.7);
+  ctx.textAlign = "right";
+  ctx.fillStyle = LiteGraph.WIDGET_TEXT_COLOR;
+  ctx.fillText(this.displayValue(), widgetWidth - margin * 2 - 20, y + height * 0.7);
+}
+
+function setVhsNumberValue(widget, node, value) {
+  widget.callback(value);
+  node.graph?.setDirtyCanvas(true);
+}
+
+function mouseVhsNumber(event, [x], node) {
+  const widgetWidth = this.width || node.size[0];
+  const margin = 15;
+  const step = this.options.step || 1;
+  let direction = 0;
+  if (x > margin + 6 && x < margin + 16) direction = -1;
+  else if (x > widgetWidth - margin - 16 && x < widgetWidth - margin - 6) direction = 1;
+  if (event.type === "pointermove" && event.deltaX) {
+    setVhsNumberValue(this, node, this.value + event.deltaX * step);
+  } else if (event.type === "pointerdown" && direction) {
+    setVhsNumberValue(this, node, this.value + direction * step);
+  } else if (event.type === "pointerup" && event.click_time < 200 && !direction) {
+    const dialog = app.canvas.prompt("Value", this.value, (value) => setVhsNumberValue(this, node, value), event);
+    const input = dialog?.querySelector?.(".value");
+    input?.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key !== "Tab") return;
+      keyEvent.preventDefault();
+      setVhsNumberValue(this, node, input.value);
+      dialog.close();
+    });
+  }
+  return true;
+}
+
+function createVhsNumberWidget(node, inputName, inputData, integer) {
+  const options = Object.assign({}, inputData?.[1] ?? {});
+  const widget = {
+    name: inputName,
+    type: "VHS.ANNOTATED",
+    value: options.default ?? 0,
+    options,
+    config: inputData,
+    draw: drawVhsNumber,
+    mouse: mouseVhsNumber,
+    computeSize(width) { return [width, 20]; },
+    callback(value) { this.value = clampVhsNumber(value, this.options, integer); },
+    displayValue() { return integer ? String(this.value | 0) : roundVhsNumber(this.value, this.options.precision ?? 3); },
+  };
+  (node.widgets ??= []).push(widget);
+  return widget;
+}
+
 function useKVState(nodeType) {
   chainCallback(nodeType.prototype, "onNodeCreated", function () {
     chainCallback(this, "onConfigure", function (info) {
@@ -403,6 +510,16 @@ function addFormatWidgets(nodeType) {
 
 app.registerExtension({
   name: "FeiHou.VideoCombineV2",
+  getCustomWidgets() {
+    return {
+      VHSFLOAT(node, inputName, inputData) {
+        return createVhsNumberWidget(node, inputName, inputData, false);
+      },
+      VHSINT(node, inputName, inputData) {
+        return createVhsNumberWidget(node, inputName, inputData, true);
+      },
+    };
+  },
   beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData?.name !== NODE_NAME) return;
     useKVState(nodeType);

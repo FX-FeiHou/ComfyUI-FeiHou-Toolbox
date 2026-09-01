@@ -2,7 +2,7 @@
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.9.2**.
+Current version: **v2.9.3**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -87,6 +87,10 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.9.3
+
+- Bundled the original VHS numeric widgets in Video Combine V2. `frame_rate` and `loop_count` now remain normal widgets when VideoHelperSuite is not installed, instead of becoming required sockets.
 
 ### v2.9.2
 
