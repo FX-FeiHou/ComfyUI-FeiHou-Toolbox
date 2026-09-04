@@ -47,6 +47,7 @@ from comfy_api.latest import ComfyExtension, io
 from comfy.ldm.sam3.tracker import unpack_masks
 
 from .video_combine_v2 import VideoCombineV2
+from .video_preview import FeiHouVideoPreview
 
 try:
     from server import PromptServer
@@ -2358,6 +2359,7 @@ class FeiHouToolboxExtension(ComfyExtension):
             FastGroupsBypassSwitch,
             RandomSeedNoise,
             VideoCombineV2,
+            FeiHouVideoPreview,
         ]
 
 
