@@ -21,6 +21,13 @@ nodes = importlib.import_module("fh_media_test.feihou_api_nodes")
 
 
 class MediaTests(unittest.TestCase):
+    def test_import_without_core_preview_helper(self):
+        legacy = types.ModuleType("comfy_extras.nodes_video")
+        with patch.dict(sys.modules, {"comfy_extras.nodes_video": legacy}):
+            importlib.reload(nodes)
+            self.assertTrue(callable(nodes.save_video_preview))
+            self.assertEqual(len(nodes.FeiHouApiVideo.define_schema().outputs), 3)
+
     def test_last_frame_output(self):
         import av
         import numpy as np
@@ -37,6 +44,20 @@ class MediaTests(unittest.TestCase):
             for packet in stream.encode():
                 container.mux(packet)
         video = data.getvalue()
+        preview = importlib.import_module("fh_media_test.api_video_preview")
+        real_video = nodes.InputImpl.VideoFromFile(BytesIO(video))
+        class LegacyVideo:
+            # Match 0.33.1: no preset argument.
+            def save_to(self, path, format, codec):
+                real_video.save_to(path, format=format, codec=codec)
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(preview.folder_paths, "get_temp_directory", return_value=directory):
+                result = preview.save_video_preview(LegacyVideo())
+                self.assertIsNotNone(result)
+                files = list(Path(directory).glob("*.mp4"))
+                self.assertEqual(len(files), 1)
+                with av.open(str(files[0])) as saved:
+                    self.assertEqual(len(list(saved.decode(video=0))), 3)
         tail = nodes._video_last_frame({}, video)
         self.assertEqual(tuple(tail.shape), (1, 16, 16, 3))
         self.assertGreater(float(tail.mean()), 0.9)

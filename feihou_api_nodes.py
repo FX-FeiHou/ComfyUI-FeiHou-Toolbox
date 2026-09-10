@@ -26,7 +26,7 @@ from PIL import Image
 import comfy.utils
 import comfy.model_management
 from comfy_api.latest import InputImpl, io
-from comfy_extras.nodes_video import save_video_preview
+from .api_video_preview import save_video_preview
 from .feihou_api_media import collect_media, prepare_media
 
 
