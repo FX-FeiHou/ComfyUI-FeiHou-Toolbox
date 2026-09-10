@@ -45,7 +45,7 @@ git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git
 
 `媒体输入` 接口也兼容原生 IMAGE（批次）、VIDEO 或 AUDIO；使用独立载入节点时提供可视化 `@` 选择。模型的实际素材限制仍生效：例如 Seedance 多模态需选择 `-multi`，`-t2v` 不接受参考素材，生图接口不接收视频和音频。API Key 会随普通节点控件保存在工作流中，分享前请清空。
 
-范例工作流位于 `workflows/FeiHou_API_Image_example.json` 和 `workflows/FeiHou_API_Video_example.json`。
+范例工作流：[API 生图与视频合并范例](workflows/FeiHou_API_Image%26Video_example.json)。
 
 节点显示标题会跟随当前 ComfyUI 界面语言自动切换。本文档展示中文标题。
 
@@ -60,6 +60,15 @@ git clone https://github.com/FX-FeiHou/ComfyUI-FeiHou-Toolbox.git
 | 多框忽略并切换 | `FastGroupsBypassSwitch` | v2.0 |
 | 随机种子噪波 | `RandomSeedNoise` | v2.8 |
 | Video Combine 🎥🅥🅗🅢 V2 | `VideoCombineV2` | v2.9 |
+| FeiHou-视频预览 | `FeiHouVideoPreview` | v2.9.5 |
+| FeiHou-API Images | `FeiHouApiImage` | v2.10.0 |
+| FeiHou-API Video | `FeiHouApiVideo` | v2.10.0 |
+| FeiHou-API Media | `FeiHouApiMediaLoader` | v2.10.0 |
+
+- **FeiHou-视频预览**：预览生成或本地载入的视频，支持循环播放与预览控制。
+- **FeiHou-API Images**：API 生图，支持模型选择、分辨率、画面比例和媒体参考。
+- **FeiHou-API Video**：API 生视频，按模型提供生成参数，输出视频、视频链接和尾帧图片。
+- **FeiHou-API Media**：独立媒体载入，最多支持 9 图、3 视频、3 音频，通过连线在提示词中 `@` 引用。
 
 ### 创建 SCAIL-2 彩色遮罩 V2
 

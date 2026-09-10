@@ -55,6 +55,15 @@ Node display titles follow the current ComfyUI language setting. This English RE
 | Fast Groups Bypass Switch | `FastGroupsBypassSwitch` | v2.0 |
 | Random Seed Noise | `RandomSeedNoise` | v2.8 |
 | Video Combine 🎥🅥🅗🅢 V2 | `VideoCombineV2` | v2.9 |
+| FeiHou-Video Preview | `FeiHouVideoPreview` | v2.9.5 |
+| FeiHou-API Images | `FeiHouApiImage` | v2.10.0 |
+| FeiHou-API Video | `FeiHouApiVideo` | v2.10.0 |
+| FeiHou-API Media | `FeiHouApiMediaLoader` | v2.10.0 |
+
+- **FeiHou-Video Preview**: preview generated or uploaded videos with looping playback and preview controls.
+- **FeiHou-API Images**: API image generation with model selection, resolution, aspect ratio and media references.
+- **FeiHou-API Video**: API video generation with model-specific parameters; outputs VIDEO, a video URL and a last-frame IMAGE.
+- **FeiHou-API Media**: standalone gallery for up to 9 images, 3 videos and 3 audio files, with linked prompt `@` references.
 
 ### Create SCAIL-2 Colored Mask V2
 
