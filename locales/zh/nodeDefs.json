@@ -254,23 +254,181 @@
   },
   "VideoCombineV2": {
     "inputs": {
-      "audio": { "name": "音频", "tooltip": "音频会直接编码进唯一的最终视频文件。" },
-      "images": { "name": "图像" },
-      "meta_batch": { "name": "批次管理" },
-      "vae": { "name": "vae" },
-      "frame_rate": { "name": "帧率" },
-      "loop_count": { "name": "循环次数" },
-      "filename_prefix": { "name": "文件名前缀" },
-      "format": { "name": "格式" },
-      "pix_fmt": { "name": "pix_fmt" },
-      "crf": { "name": "crf" },
-      "save_metadata": { "name": "保存元数据", "tooltip": "请保持开启，以在视频内嵌入提示词和工作流元数据。" },
-      "trim_to_audio": { "name": "修剪音频" },
-      "pingpong": { "name": "Ping-Pong" },
-      "save_output": { "name": "保存到输出文件夹" }
+      "audio": {
+        "name": "音频",
+        "tooltip": "音频会直接编码进唯一的最终视频文件。"
+      },
+      "images": {
+        "name": "图像"
+      },
+      "meta_batch": {
+        "name": "批次管理"
+      },
+      "vae": {
+        "name": "vae"
+      },
+      "frame_rate": {
+        "name": "帧率"
+      },
+      "loop_count": {
+        "name": "循环次数"
+      },
+      "filename_prefix": {
+        "name": "文件名前缀"
+      },
+      "format": {
+        "name": "格式"
+      },
+      "pix_fmt": {
+        "name": "pix_fmt"
+      },
+      "crf": {
+        "name": "crf"
+      },
+      "save_metadata": {
+        "name": "保存元数据",
+        "tooltip": "请保持开启，以在视频内嵌入提示词和工作流元数据。"
+      },
+      "trim_to_audio": {
+        "name": "修剪音频"
+      },
+      "pingpong": {
+        "name": "Ping-Pong"
+      },
+      "save_output": {
+        "name": "保存到输出文件夹"
+      }
     },
     "outputs": {
-      "0": { "name": "视频" }
+      "0": {
+        "name": "视频"
+      }
+    }
+  },
+  "FeiHouApiImage": {
+    "display_name": "FeiHou-API Images",
+    "inputs": {
+      "api_key": {
+        "name": "API Key",
+        "tooltip": "仅发送至 api.fei-hou.net；含有 API Key 的工作流不要分享给他人。"
+      },
+      "model": {
+        "name": "模型",
+        "tooltip": "填写 API Key 后点击“刷新模型列表”。"
+      },
+      "prompt": {
+        "name": "提示词"
+      },
+      "resolution": {
+        "name": "分辨率",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "aspect_ratio": {
+        "name": "画面比例",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "width": {
+        "name": "自定义宽度",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "height": {
+        "name": "自定义高度",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "output_format": {
+        "name": "图片格式",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "seed": {
+        "name": "种子（-1 随机）",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "media": {
+        "name": "媒体输入",
+        "tooltip": "连接 FeiHou-API Media节点；提示词输入 @ 引用其中的素材。"
+      },
+      "media_files": {
+        "name": "媒体记录"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "图像"
+      },
+      "1": {
+        "name": "图像链接"
+      }
+    }
+  },
+  "FeiHouApiVideo": {
+    "display_name": "FeiHou-API Video",
+    "inputs": {
+      "api_key": {
+        "name": "API Key",
+        "tooltip": "仅发送至 api.fei-hou.net；含有 API Key 的工作流不要分享给他人。"
+      },
+      "model": {
+        "name": "模型",
+        "tooltip": "填写 API Key 后点击“刷新模型列表”。"
+      },
+      "prompt": {
+        "name": "提示词"
+      },
+      "resolution": {
+        "name": "分辨率",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "aspect_ratio": {
+        "name": "画面比例",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "duration": {
+        "name": "时长（秒，-1 自动）",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "seed": {
+        "name": "种子（-1 随机）",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "generate_audio": {
+        "name": "生成音频",
+        "tooltip": "选项随模型变化；default 使用模型默认值。宽高仅在 custom 模式下生效。"
+      },
+      "return_last_frame": {
+        "name": "请求返回尾帧",
+        "tooltip": "向支持的模型请求尾帧图片；未返回时自动从成品视频提取最后一帧，关闭此选项也可使用尾帧输出。"
+      },
+      "media": {
+        "name": "媒体输入",
+        "tooltip": "连接 FeiHou-API Media节点；提示词输入 @ 引用其中的素材。"
+      },
+      "media_files": {
+        "name": "媒体记录"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "视频"
+      },
+      "1": {
+        "name": "视频链接"
+      },
+      "2": {
+        "name": "尾帧"
+      }
+    }
+  },
+  "FeiHouApiMediaLoader": {
+    "display_name": "FeiHou-API Media",
+    "inputs": {
+      "media_files": {
+        "name": "媒体记录"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "媒体"
+      }
     }
   }
 }

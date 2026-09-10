@@ -48,6 +48,8 @@ from comfy.ldm.sam3.tracker import unpack_masks
 
 from .video_combine_v2 import VideoCombineV2
 from .video_preview import FeiHouVideoPreview
+from .feihou_api_nodes import FeiHouApiError, FeiHouApiImage, FeiHouApiVideo, fetch_models_for_route, parameter_options
+from .feihou_api_media import FeiHouApiMediaLoader
 
 try:
     from server import PromptServer
@@ -2279,6 +2281,26 @@ class RandomSeedNoise(io.ComfyNode):
 
 
 if PromptServer is not None:
+    @PromptServer.instance.routes.get("/feihou/api/parameters")
+    async def feihou_api_parameters(request):
+        return web.json_response(parameter_options(request.query.get("model", ""), request.query.get("kind", "image")))
+
+    @PromptServer.instance.routes.post("/feihou/api/models")
+    async def feihou_api_models(request):
+        """Refresh models from the fixed provider endpoint without storing keys."""
+        try:
+            data = await request.json()
+            models = await fetch_models_for_route(
+                str((data or {}).get("api_key") or ""),
+                str((data or {}).get("kind") or ""),
+            )
+            return web.json_response({"models": models})
+        except FeiHouApiError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except Exception:
+            LOGGER.exception("FeiHou API model refresh failed")
+            return web.json_response({"error": "Could not refresh the model list."}, status=500)
+
     @PromptServer.instance.routes.post("/feihou/manual_collage/load")
     async def feihou_manual_collage_load(request):
         try:
@@ -2360,6 +2382,9 @@ class FeiHouToolboxExtension(ComfyExtension):
             RandomSeedNoise,
             VideoCombineV2,
             FeiHouVideoPreview,
+            FeiHouApiImage,
+            FeiHouApiVideo,
+            FeiHouApiMediaLoader,
         ]
 
 

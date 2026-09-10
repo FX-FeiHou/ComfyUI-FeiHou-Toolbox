@@ -1,0 +1,69 @@
+/* Let ComfyUI receive drags on the border and lower resize handles.
+ * The gallery workbench opts back in to pointer events inside the node. */
+.dom-widget:has(> .fh-api-loader) { pointer-events: none !important; }
+
+/* Media gallery styles copied from FeiHou Easy H3 (GPL-3.0).
+ * Only selectors are scoped to this standalone loader; layout/color values are unchanged. */
+.fh-api-loader .fh-h3-embedded-workbench {
+        display: flex; flex-direction: column; gap: 8px; width: auto; height: 100%; min-width: 0; min-height: 0; box-sizing: border-box; margin: 0 10px; padding: 2px 0 12px;
+      }
+      .fh-api-loader .fh-h3-media-gallery {
+        --fh-h3-image-slot-height: 72px; --fh-h3-video-slot-height: 68px;
+        display: grid; grid-auto-rows: max-content; align-content: start; gap: 8px; width: 100%; height: var(--fh-h3-gallery-height, auto); flex: 0 0 var(--fh-h3-gallery-height, auto); min-width: 0; box-sizing: border-box; margin: 0; padding: 0;
+        color: var(--h3-native-widget-text, rgba(255,255,255,.88)); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .fh-api-loader .fh-h3-media-gallery.is-image-mode .fh-h3-media-section.is-video,
+      .fh-api-loader .fh-h3-media-gallery.is-image-mode .fh-h3-media-section.is-audio { display: none; }
+      .fh-api-loader .fh-h3-media-section { display: grid; grid-auto-rows: max-content; align-content: start; gap: 4px; min-width: 0; }
+      .fh-api-loader .fh-h3-media-heading {
+        overflow: hidden; color: var(--h3-native-widget-muted, rgba(255,255,255,.54)); font-size: 10px; font-weight: 650;
+        line-height: 16px; letter-spacing: .035em; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .fh-api-loader .fh-h3-media-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start; gap: 4px; min-width: 0; }
+      .fh-api-loader .fh-h3-media-slot {
+        appearance: none; position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; height: var(--fh-h3-image-slot-height); overflow: hidden;
+        box-sizing: border-box; padding: 0; border: 1px dashed var(--h3-native-widget-outline, rgba(255,255,255,.18)); border-radius: 7px;
+        background: rgba(255,255,255,.035); color: var(--h3-native-widget-muted, rgba(255,255,255,.48)); cursor: pointer;
+        transition: border-color .12s ease, background-color .12s ease, opacity .12s ease, transform .12s ease;
+      }
+      .fh-api-loader .fh-h3-media-grid.is-video .fh-h3-media-slot { height: var(--fh-h3-video-slot-height); }
+      .fh-api-loader .fh-h3-media-grid.is-audio .fh-h3-media-slot { height: 54px; }
+      .fh-api-loader .fh-h3-audio-trim-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; min-width: 0; }
+      .fh-api-loader .fh-h3-audio-trim-control { display: flex; min-width: 0; gap: 3px; }
+      .fh-api-loader .fh-h3-audio-trim-input {
+        display: block; width: 100%; min-width: 0; flex: 1 1 auto; height: 24px; box-sizing: border-box; padding: 1px 5px;
+        border: 1px solid var(--h3-native-widget-outline, rgba(255,255,255,.18)); border-radius: 4px;
+        background: var(--h3-native-widget-bg, rgba(0,0,0,.22)); color: var(--h3-native-widget-text, rgba(255,255,255,.88));
+        font: 500 10px/1 Consolas, "Courier New", monospace; outline: none;
+      }
+      .fh-api-loader .fh-h3-audio-trim-input:focus { border-color: var(--h3-native-widget-focus, rgba(79,150,255,.9)); }
+      .fh-api-loader .fh-h3-audio-trim-input:disabled { opacity: .42; cursor: not-allowed; }
+      .fh-api-loader .fh-h3-audio-preview-button { flex: 0 0 24px; width: 24px; height: 24px; padding: 0; border: 1px solid var(--h3-native-widget-outline, rgba(255,255,255,.18)); border-radius: 4px; background: var(--h3-native-widget-bg, rgba(0,0,0,.22)); color: var(--h3-native-widget-text, rgba(255,255,255,.88)); cursor: pointer; font: 700 11px/1 system-ui; }
+      .fh-api-loader .fh-h3-audio-preview-button:hover:not(:disabled), .fh-api-loader .fh-h3-audio-preview-button:focus-visible { border-color: rgba(79,150,255,.9); background: rgba(79,150,255,.18); outline: none; }
+      .fh-api-loader .fh-h3-audio-preview-button:disabled { opacity: .42; cursor: not-allowed; }
+      .fh-api-loader .fh-h3-media-slot:hover, .fh-api-loader .fh-h3-media-slot:focus-visible, .fh-api-loader .fh-h3-media-slot.is-dragover {
+        border-color: rgba(0,226,187,.64); background: rgba(0,226,187,.075); outline: none;
+      }
+      .fh-api-loader .fh-h3-media-slot.has-media[draggable="true"] { cursor: grab; }
+      .fh-api-loader .fh-h3-media-slot.is-reordering { opacity: .45; cursor: grabbing; }
+      .fh-api-loader .fh-h3-media-slot.is-reorder-target { border-color: rgba(79,150,255,.95); background: rgba(79,150,255,.16); box-shadow: inset 0 0 0 1px rgba(79,150,255,.4); }
+      .fh-api-loader .fh-h3-media-slot:active:not(.is-disabled) { transform: scale(.985); }
+      .fh-api-loader .fh-h3-media-slot.has-media { border-style: solid; border-color: rgba(255,255,255,.18); background: rgba(0,0,0,.28); }
+      .fh-api-loader .fh-h3-media-slot.is-disabled { opacity: .24; cursor: not-allowed; filter: grayscale(.8); }
+      .fh-api-loader .fh-h3-media-slot.is-uploading { cursor: wait; opacity: .68; }
+      .fh-api-loader .fh-h3-media-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #111; pointer-events: none; }
+      .fh-api-loader .fh-h3-media-audio-icon { width: 40px; height: 40px; object-fit: contain; opacity: .86; pointer-events: none; }
+      .fh-api-loader .fh-h3-media-slot-badge {
+        position: absolute; left: 4px; top: 4px; z-index: 2; display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px;
+        border-radius: 5px; background: rgba(0,0,0,.68); color: rgba(255,255,255,.9); font: 700 9px/1 Consolas, monospace; pointer-events: none;
+      }
+      .fh-api-loader .fh-h3-media-slot-status {
+        position: absolute; left: 4px; right: 4px; bottom: 4px; z-index: 2; overflow: hidden; padding: 2px 4px; border-radius: 4px;
+        background: rgba(0,0,0,.62); color: rgba(255,255,255,.8); font: 500 8px/12px system-ui, sans-serif; text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
+      }
+      .fh-api-loader .fh-h3-media-slot:not(.has-media) .fh-h3-media-slot-status { background: transparent; color: inherit; white-space: normal; text-align: center; }
+      .fh-api-loader .fh-h3-media-slot-clear {
+        appearance: none; position: absolute; right: 4px; top: 4px; z-index: 3; display: inline-flex; align-items: center; justify-content: center;
+        width: 18px; height: 18px; padding: 0; border: 0; border-radius: 5px; background: rgba(0,0,0,.7); color: #fff; cursor: pointer; font: 700 14px/1 system-ui;
+      }
+      .fh-api-loader .fh-h3-media-slot-clear:hover, .fh-api-loader .fh-h3-media-slot-clear:focus-visible { background: rgba(212,70,70,.9); outline: none; }

@@ -254,23 +254,181 @@
   },
   "VideoCombineV2": {
     "inputs": {
-      "audio": { "name": "audio", "tooltip": "Audio is encoded directly into the single final video file." },
-      "images": { "name": "images" },
-      "meta_batch": { "name": "meta batch" },
-      "vae": { "name": "vae" },
-      "frame_rate": { "name": "frame rate" },
-      "loop_count": { "name": "loop count" },
-      "filename_prefix": { "name": "filename prefix" },
-      "format": { "name": "format" },
-      "pix_fmt": { "name": "pix_fmt" },
-      "crf": { "name": "crf" },
-      "save_metadata": { "name": "save metadata", "tooltip": "Keep enabled to embed prompt and workflow metadata in the video." },
-      "trim_to_audio": { "name": "trim to audio" },
-      "pingpong": { "name": "Ping-Pong" },
-      "save_output": { "name": "save to output directory" }
+      "audio": {
+        "name": "audio",
+        "tooltip": "Audio is encoded directly into the single final video file."
+      },
+      "images": {
+        "name": "images"
+      },
+      "meta_batch": {
+        "name": "meta batch"
+      },
+      "vae": {
+        "name": "vae"
+      },
+      "frame_rate": {
+        "name": "frame rate"
+      },
+      "loop_count": {
+        "name": "loop count"
+      },
+      "filename_prefix": {
+        "name": "filename prefix"
+      },
+      "format": {
+        "name": "format"
+      },
+      "pix_fmt": {
+        "name": "pix_fmt"
+      },
+      "crf": {
+        "name": "crf"
+      },
+      "save_metadata": {
+        "name": "save metadata",
+        "tooltip": "Keep enabled to embed prompt and workflow metadata in the video."
+      },
+      "trim_to_audio": {
+        "name": "trim to audio"
+      },
+      "pingpong": {
+        "name": "Ping-Pong"
+      },
+      "save_output": {
+        "name": "save to output directory"
+      }
     },
     "outputs": {
-      "0": { "name": "video" }
+      "0": {
+        "name": "video"
+      }
+    }
+  },
+  "FeiHouApiImage": {
+    "display_name": "FeiHou-API Images",
+    "inputs": {
+      "api_key": {
+        "name": "API Key",
+        "tooltip": "Sent only to api.fei-hou.net. Do not share a workflow containing this API key."
+      },
+      "model": {
+        "name": "model",
+        "tooltip": "Enter an API key, then click Refresh models."
+      },
+      "prompt": {
+        "name": "prompt"
+      },
+      "resolution": {
+        "name": "Resolution",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "aspect_ratio": {
+        "name": "Aspect ratio",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "width": {
+        "name": "Custom width",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "height": {
+        "name": "Custom height",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "output_format": {
+        "name": "Image format",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "seed": {
+        "name": "Seed (-1 random)",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "media": {
+        "name": "Media input",
+        "tooltip": "Connect FeiHou-API Media; type @ in the prompt to reference its media."
+      },
+      "media_files": {
+        "name": "Media records"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "image"
+      },
+      "1": {
+        "name": "image URL"
+      }
+    }
+  },
+  "FeiHouApiVideo": {
+    "display_name": "FeiHou-API Video",
+    "inputs": {
+      "api_key": {
+        "name": "API Key",
+        "tooltip": "Sent only to api.fei-hou.net. Do not share a workflow containing this API key."
+      },
+      "model": {
+        "name": "model",
+        "tooltip": "Enter an API key, then click Refresh models."
+      },
+      "prompt": {
+        "name": "prompt"
+      },
+      "resolution": {
+        "name": "Resolution",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "aspect_ratio": {
+        "name": "Aspect ratio",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "duration": {
+        "name": "Duration (seconds, -1 auto)",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "seed": {
+        "name": "Seed (-1 random)",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "generate_audio": {
+        "name": "Generate audio",
+        "tooltip": "Choices depend on the model; default uses provider defaults. Width/height apply in custom mode."
+      },
+      "return_last_frame": {
+        "name": "Request last frame",
+        "tooltip": "Ask supported models for a tail image; otherwise extract the final video frame. The last frame output also works with this option off."
+      },
+      "media": {
+        "name": "Media input",
+        "tooltip": "Connect FeiHou-API Media; type @ in the prompt to reference its media."
+      },
+      "media_files": {
+        "name": "Media records"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "video"
+      },
+      "1": {
+        "name": "video URL"
+      },
+      "2": {
+        "name": "Last frame"
+      }
+    }
+  },
+  "FeiHouApiMediaLoader": {
+    "display_name": "FeiHou-API Media",
+    "inputs": {
+      "media_files": {
+        "name": "Media records"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Media"
+      }
     }
   }
 }

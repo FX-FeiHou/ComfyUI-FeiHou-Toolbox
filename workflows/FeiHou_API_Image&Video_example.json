@@ -1,0 +1,827 @@
+{
+  "id": "36397889-2459-4c9e-9460-d178da447fe2",
+  "revision": 0,
+  "last_node_id": 17,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 6,
+      "type": "SaveImage",
+      "pos": [
+        594.4440934321955,
+        163.11757823785575
+      ],
+      "size": [
+        532.8126694329185,
+        607.0541659751037
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "SaveImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "ComfyUI"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "ComfyUI"
+      },
+      "color": "#9cd4b4",
+      "bgcolor": "#2a6041",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 8,
+      "type": "SaveVideo",
+      "pos": [
+        1737.367899437071,
+        177.742017218702
+      ],
+      "size": [
+        532.8126694329185,
+        130
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "SaveVideo",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "video/ComfyUI",
+        "mp4",
+        "h264",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/ComfyUI",
+        "format": "mp4",
+        "format.codec": "h264",
+        "format.codec.encoding": "auto",
+        "codec": "auto"
+      },
+      "color": "#9ca7c9",
+      "bgcolor": "#2D3653",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 1,
+      "type": "FeiHouApiImage",
+      "pos": [
+        124.44409343219559,
+        163.11757823785575
+      ],
+      "size": [
+        430,
+        607.0541659751037
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "媒体输入",
+          "name": "media",
+          "shape": 7,
+          "type": "*",
+          "link": 11
+        },
+        {
+          "label": "模型",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "image_url",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "feihou-toolbox",
+        "ver": "f9edc9a0e03250478d92149248bddfd0115784fb",
+        "Node name for S&R": "FeiHouApiImage",
+        "fh_api_models": [
+          "dola-seedream-5.0-pro-i2i",
+          "dola-seedream-5.0-pro-layer-decomposition",
+          "dola-seedream-5.0-pro-t2i",
+          "feihou-image-g-v2-lowprice",
+          "feihou-image-g-v2.5-flare",
+          "feihou-image-g-v2.5-lowprice",
+          "feihou-image-g-v2.5-sunburst",
+          "feihou-image-g2-i2i",
+          "feihou-image-g2-t2i",
+          "feihou-image-gk-v15",
+          "feihou-image-gk-v15-edit",
+          "feihou-image-gk-v2",
+          "feihou-image-gk-v2-edit",
+          "feihou-image-gk-v2-region-edit",
+          "feihou-image-gk-v2-segment",
+          "feihou-image-nb-2",
+          "feihou-image-nb-2-lite",
+          "feihou-image-nb-flash",
+          "feihou-image-nb-pro",
+          "midjourney-edits",
+          "midjourney-high-variation",
+          "midjourney-imagine",
+          "midjourney-inpaint",
+          "midjourney-video",
+          "qwen-image-3.0-global-i2i",
+          "qwen-image-3.0-global-pro-i2i",
+          "qwen-image-3.0-global-pro-t2i",
+          "qwen-image-3.0-global-t2i",
+          "qwen-image-3.0-i2i",
+          "qwen-image-3.0-pro-i2i",
+          "qwen-image-3.0-pro-t2i",
+          "qwen-image-3.0-t2i",
+          "seedream-v5-pro-i2i",
+          "seedream-v5-pro-layer-decomposition",
+          "seedream-v5-pro-t2i",
+          "vosr2-image-upscale",
+          "vosr2-video-upscale",
+          "wan-2.7-global-i2i",
+          "wan-2.7-global-i2i-pro",
+          "wan-2.7-global-t2i"
+        ],
+        "fh_api_media": [],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "",
+        "feihou-image-g-v2.5-lowprice",
+        "一只金色小猴子站在云端，电影感光线，细节丰富，高质量画面",
+        "",
+        "1k",
+        "16:9",
+        1024,
+        1024,
+        "default",
+        393404672,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "api_key": "",
+        "model": "feihou-image-g-v2.5-lowprice",
+        "刷新模型列表": "一只金色小猴子站在云端，电影感光线，细节丰富，高质量画面",
+        "prompt": "",
+        "resolution": "1k",
+        "aspect_ratio": "16:9",
+        "width": 1024,
+        "height": 1024,
+        "output_format": "default",
+        "seed": 393404672,
+        "media_files": "randomize"
+      },
+      "color": "#9cd4b4",
+      "bgcolor": "#2a6041",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 7,
+      "type": "FeiHouApiVideo",
+      "pos": [
+        1267.367899437071,
+        177.742017218702
+      ],
+      "size": [
+        430,
+        588
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "媒体输入",
+          "name": "media",
+          "shape": 7,
+          "type": "*",
+          "link": 12
+        },
+        {
+          "label": "模型",
+          "name": "model",
+          "type": "COMBO",
+          "widget": {
+            "name": "model"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "slot_index": 0,
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "last_frame",
+          "type": "IMAGE",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "feihou-toolbox",
+        "ver": "f9edc9a0e03250478d92149248bddfd0115784fb",
+        "Node name for S&R": "FeiHouApiVideo",
+        "fh_api_models": [
+          "seedance-2.0-fast-t2v"
+        ],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "",
+        "seedance-2.0-fast-t2v",
+        "一只金色小猴子在云端奔跑，镜头缓慢推进，电影感光线",
+        "720p",
+        "720p",
+        "16:9",
+        "10",
+        -1,
+        "on",
+        false,
+        "[]"
+      ],
+      "widgets_values_named": {
+        "api_key": "",
+        "model": "seedance-2.0-fast-t2v",
+        "刷新模型列表": "一只金色小猴子在云端奔跑，镜头缓慢推进，电影感光线",
+        "prompt": "720p",
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "duration": "10",
+        "seed": -1,
+        "generate_audio": "on",
+        "return_last_frame": false,
+        "media_files": "[]"
+      },
+      "color": "#9ca7c9",
+      "bgcolor": "#2D3653",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 9,
+      "type": "SaveImage",
+      "pos": [
+        2310.18056886999,
+        295.9587973099888
+      ],
+      "size": [
+        473.3703703703702,
+        466.3062557883816
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.35.0",
+        "Node name for S&R": "SaveImage",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "ComfyUI"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "ComfyUI"
+      },
+      "color": "#9ca7c9",
+      "bgcolor": "#2D3653",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 12,
+      "type": "ShowText|pysssss",
+      "pos": [
+        2311.4466753969295,
+        179.22057105610347
+      ],
+      "size": [
+        472.21138233025954,
+        60.76964120331945
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 4,
+      "inputs": [
+        {
+          "label": "文本",
+          "name": "text",
+          "type": "STRING",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "label": "字符串",
+          "name": "STRING",
+          "shape": 6,
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "title": "展示文本",
+      "properties": {
+        "cnr_id": "comfyui-custom-scripts",
+        "ver": "609f3afaa74b2f88ef9ce8d939626065e3247469",
+        "Node name for S&R": "ShowText|pysssss",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "color": "#9ca7c9",
+      "bgcolor": "#2D3653",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 15,
+      "type": "Label (rgthree)",
+      "pos": [
+        -49.40809048023953,
+        -74.57280200728223
+      ],
+      "size": [
+        903.1333618164062,
+        50
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "B站 :https://space.bilibili.com/389291683",
+      "properties": {
+        "fontSize": 50,
+        "fontFamily": "Arial",
+        "fontColor": "#ffffff",
+        "textAlign": "left",
+        "backgroundColor": "transparent",
+        "padding": 0,
+        "borderRadius": 0,
+        "angle": 0,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    },
+    {
+      "id": 16,
+      "type": "Label (rgthree)",
+      "pos": [
+        -499.40809048024005,
+        -74.57280200728223
+      ],
+      "size": [
+        422.23333740234375,
+        50
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "By:三层楼的小肥猴",
+      "properties": {
+        "fontSize": 50,
+        "fontFamily": "Arial",
+        "fontColor": "#ffffff",
+        "textAlign": "left",
+        "backgroundColor": "transparent",
+        "padding": 0,
+        "borderRadius": 0,
+        "angle": 0,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    },
+    {
+      "id": 4,
+      "type": "FeiHouApiMediaLoader",
+      "pos": [
+        -492.1734337735676,
+        171.72544500870222
+      ],
+      "size": [
+        490.5320466526777,
+        577.0541659751038
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "media",
+          "type": "FEIHOU_API_MEDIA",
+          "links": [
+            11,
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "feihou-toolbox",
+        "ver": "f9edc9a0e03250478d92149248bddfd0115784fb",
+        "Node name for S&R": "FeiHouApiMediaLoader",
+        "fh_api_media": [],
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "[]"
+      ],
+      "widgets_values_named": {
+        "media_files": "[]"
+      },
+      "color": "#b0c2e1",
+      "bgcolor": "#2f4b7c",
+      "textcolor": "#000000"
+    },
+    {
+      "id": 11,
+      "type": "Fast Groups Bypasser (rgthree)",
+      "pos": [
+        -850.0047023145446,
+        86.20748882779085
+      ],
+      "size": [
+        282.2408835281367,
+        82
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "label": "可选连接",
+          "name": "OPT_CONNECTION",
+          "type": "*",
+          "links": null
+        }
+      ],
+      "properties": {
+        "matchColors": "",
+        "matchTitle": "图片|视频",
+        "showNav": true,
+        "showAllGraphs": true,
+        "sort": "position",
+        "customSortAlphabet": "",
+        "toggleRestriction": "max one",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "color": "#20090d",
+      "bgcolor": "#C9364E",
+      "textcolor": "#FFFFFF"
+    },
+    {
+      "id": 17,
+      "type": "Label (rgthree)",
+      "pos": [
+        1030.5919095197594,
+        -74.57280200728223
+      ],
+      "size": [
+        1786.38330078125,
+        50
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "交流分享入群加微信：fx-feihou  Q群：1091593367（请备注来意：加群、商务）",
+      "properties": {
+        "fontSize": 50,
+        "fontFamily": "Arial",
+        "fontColor": "#ffffff",
+        "textAlign": "left",
+        "backgroundColor": "transparent",
+        "padding": 0,
+        "borderRadius": 0,
+        "angle": 0,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    },
+    {
+      "id": 14,
+      "type": "Label (rgthree)",
+      "pos": [
+        -8.42976045572804,
+        -184.47601359283118
+      ],
+      "size": [
+        2241.949951171875,
+        60
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "【GPT-Image2.5】【Nano Banana】【SeeDance2.5】【Wan3.0】【MiniMax H3】",
+      "properties": {
+        "fontSize": 60,
+        "fontFamily": "Arial",
+        "fontColor": "#00ff00",
+        "textAlign": "left",
+        "backgroundColor": "transparent",
+        "padding": 0,
+        "borderRadius": 0,
+        "angle": 0,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    },
+    {
+      "id": 13,
+      "type": "Label (rgthree)",
+      "pos": [
+        -639.5733598010822,
+        -387.4326973655099
+      ],
+      "size": [
+        3531.533447265625,
+        150
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "【花果山Ai灵境坊】FeiHou API Image&Video 工作流",
+      "properties": {
+        "fontSize": 150,
+        "fontFamily": "Arial",
+        "fontColor": "#ffff00",
+        "textAlign": "left",
+        "backgroundColor": "transparent",
+        "padding": 0,
+        "borderRadius": 0,
+        "angle": 0,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.5.2"
+        },
+        "widget_ue_connectable": {}
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    }
+  ],
+  "links": [
+    [
+      5,
+      1,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
+      0,
+      "VIDEO"
+    ],
+    [
+      7,
+      7,
+      2,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      4,
+      0,
+      1,
+      0,
+      "FEIHOU_API_MEDIA"
+    ],
+    [
+      12,
+      4,
+      0,
+      7,
+      0,
+      "FEIHOU_API_MEDIA"
+    ],
+    [
+      13,
+      7,
+      1,
+      12,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "图片",
+      "bounding": [
+        75.43295121699276,
+        52,
+        1084.4092097727125,
+        738.4378342695919
+      ],
+      "color": "#3f789e",
+      "flags": {},
+      "font_size": 40
+    },
+    {
+      "id": 2,
+      "title": "视频",
+      "bounding": [
+        1230.676065289827,
+        60.464784946867155,
+        1587.5134900864502,
+        737.8626303964265
+      ],
+      "color": "#3f789e",
+      "flags": {},
+      "font_size": 40
+    },
+    {
+      "id": 3,
+      "title": "参考上传",
+      "bounding": [
+        -524.3309671244028,
+        52.39850066436171,
+        549.0973736873598,
+        732.8860078087347
+      ],
+      "color": "#3f789e",
+      "flags": {},
+      "font_size": 40
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ue_links": [],
+    "ds": {
+      "scale": 0.3659206166890176,
+      "offset": [
+        1358.7779598138231,
+        1016.7700506935544
+      ]
+    },
+    "links_added_by_ue": [],
+    "frontendVersion": "1.51.10",
+    "VHS_latentpreview": true,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": false,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4,
+  "seed_widgets": {
+    "1": 9,
+    "7": 7
+  }
+}
