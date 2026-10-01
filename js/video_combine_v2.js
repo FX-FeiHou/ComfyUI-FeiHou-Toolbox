@@ -494,25 +494,35 @@ function addFormatWidgets(nodeType) {
     chainCallback(formatWidget, "callback", (value) => {
       const nodeInputs = LiteGraph.registered_node_types[this.type]?.nodeData?.input;
       const formats = (nodeInputs?.required?.format ?? nodeInputs?.optional?.format)?.[1]?.formats;
+      // Detach the previous format's widgets and sockets before creating the
+      // new ones.  The frontend renames duplicate widget names ("pix_fmt" ->
+      // "pix_fmt#1") whenever two widgets with the same name exist at once,
+      // and a renamed widget never reaches the backend, which then silently
+      // falls back to its ffmpeg defaults.
+      const removed = this.widgets.splice(formatWidgetIndex, formatWidgetsCount);
+      for (const widget of removed) {
+        widget?.onRemove?.();
+        const slot = this.inputs.findIndex((input) => input.name === widget.name);
+        if (slot >= 0) this.removeInput(slot);
+      }
+      formatWidgetsCount = 0;
       const newWidgets = [];
       if (formats?.[value]) {
         for (const definition of formats[value]) {
           let type = definition[2]?.widgetType ?? definition[1];
           if (Array.isArray(type)) type = "COMBO";
-          app.widgets[type](this, definition[0], definition.slice(1), app);
-          const widget = this.widgets.pop();
+          // Current frontends return `{ widget }` from a widget constructor;
+          // older ones only push it.  Prefer the reported widget and detach it
+          // by identity so a mis-timed push can never pop an unrelated widget.
+          const created = app.widgets[type](this, definition[0], definition.slice(1), app);
+          const widget = created?.widget ?? this.widgets[this.widgets.length - 1];
+          const createdIndex = this.widgets.lastIndexOf(widget);
+          if (createdIndex >= 0) this.widgets.splice(createdIndex, 1);
           widget.config = definition.slice(1);
           newWidgets.push(widget);
         }
       }
-      const removed = this.widgets.splice(formatWidgetIndex, formatWidgetsCount, ...newWidgets);
-      const newNames = new Set(newWidgets.map((widget) => widget.name));
-      for (const widget of removed) {
-        widget?.onRemove?.();
-        if (newNames.has(widget.name)) continue;
-        const slot = this.inputs.findIndex((input) => input.name === widget.name);
-        if (slot >= 0) this.removeInput(slot);
-      }
+      this.widgets.splice(formatWidgetIndex, 0, ...newWidgets);
       for (const widget of newWidgets) {
         const existingInput = this.inputs.find((input) => input.name === widget.name);
         if (existingInput) setWidgetConfig(existingInput, widget.config);
