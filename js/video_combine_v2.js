@@ -128,8 +128,23 @@ function createVhsNumberWidget(node, inputName, inputData, integer) {
     callback(value) { this.value = clampVhsNumber(value, this.options, integer); },
     displayValue() { return integer ? String(this.value | 0) : roundVhsNumber(this.value, this.options.precision ?? 3); },
   };
-  (node.widgets ??= []).push(widget);
-  return widget;
+  // The frontend installs `widgets` on the node as an accessor pair: reading
+  // it before the view is materialised returns undefined, and assigning to it
+  // only copies the assigned array's contents into the live view.  Writing
+  // `(node.widgets ??= []).push(widget)` therefore pushes into a throw-away
+  // array literal that is dropped immediately, so the widget never reaches the
+  // node.  That silently loses the first custom widget of the node - the
+  // frame_rate field - which then falls back to its backend default of 8 and
+  // makes Video Combine render every clip at 8 fps.  Materialise the view
+  // first, then push through the live array.
+  node.widgets ??= [];
+  node.widgets.push(widget);
+  // Report the widget to the frontend as well: a constructor result without a
+  // `widget` field cannot be linked to its input slot, which makes the
+  // frontend add a stray socket for it and lose the rest of the node state.
+  // Returning it also lets the frontend honour `socketless`, so a socketless
+  // number field never grows an input socket.
+  return { widget };
 }
 
 function useKVState(nodeType) {
