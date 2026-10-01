@@ -2,6 +2,36 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
 const NODE_NAME = "FeiHouVideoPreview";
+const previewElements = new WeakMap();
+const isVideoFile = (file) => file && (file.type?.startsWith("video/") || /\.(mp4|webm|mkv|mov|m4v|avi|ogv)$/i.test(file.name || ""));
+
+function installLocalVideoDrop() {
+  function targetNode(event) {
+    for (const element of event.composedPath()) {
+      const node = previewElements.get(element);
+      if (node) return node;
+    }
+    const canvas = app.canvas;
+    if (event.target !== canvas?.canvas) return null;
+    const pos = canvas.convertEventToCanvasOffset(event);
+    const node = canvas.graph?.getNodeOnPos(pos[0], pos[1]);
+    return node?.comfyClass === NODE_NAME || node?.type === NODE_NAME ? node : null;
+  }
+  // Capture before ComfyUI's canvas/document handlers try to import metadata.
+  for (const name of ["dragover", "drop"]) {
+    window.addEventListener(name, (event) => {
+      if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+      const node = targetNode(event);
+      if (!node) return;
+      const file = name === "drop" ? Array.from(event.dataTransfer.files).find(isVideoFile) : null;
+      if (name === "drop" && !file) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (name === "dragover") event.dataTransfer.dropEffect = "copy";
+      else node.widgets?.find(w => w.name === "videopreview")?.showLocalFile(file);
+    }, true);
+  }
+}
 
 function isChineseLocale() {
   const locale = app.ui?.settings?.getSettingValue?.("Comfy.Locale") || navigator.language || "en";
@@ -43,6 +73,7 @@ function addVideoPreview(nodeType) {
   chainCallback(nodeType.prototype, "onNodeCreated", function () {
     const node = this;
     const element = document.createElement("div");
+    previewElements.set(element, node);
     const previewWidget = this.addDOMWidget("videopreview", "preview", element, {
       serialize: false,
       hideOnZoom: false,
@@ -50,6 +81,7 @@ function addVideoPreview(nodeType) {
       setValue(value) { element.value = value; },
     });
     previewWidget.computeSize = function (width) {
+      if (this.statusEl?.textContent && !this.parentEl.hidden) return [width, 100];
       if (this.aspectRatio && !this.parentEl.hidden) {
         const height = Math.max(0, (node.size[0] - 20) / this.aspectRatio + 10);
         return [width, height];
@@ -68,18 +100,34 @@ function addVideoPreview(nodeType) {
     previewWidget.parentEl.style.width = "100%";
     element.appendChild(previewWidget.parentEl);
 
+    previewWidget.statusEl = document.createElement("div");
+    previewWidget.statusEl.style.cssText = "padding:10px;white-space:normal;overflow-wrap:anywhere;color:#ddd;font:12px/1.5 sans-serif";
+    previewWidget.parentEl.appendChild(previewWidget.statusEl);
+    previewWidget.showStatus = function (message) {
+      this.statusEl.textContent = message;
+      this.statusEl.hidden = !message;
+      this.parentEl.hidden = Boolean(this.value.hidden);
+      fitHeight(node);
+    };
+
     previewWidget.videoEl = document.createElement("video");
     previewWidget.videoEl.controls = false;
     previewWidget.videoEl.loop = true;
     previewWidget.videoEl.muted = true;
+    previewWidget.videoEl.playsInline = true;
+    previewWidget.videoEl.preload = "auto";
     previewWidget.videoEl.style.width = "100%";
     previewWidget.videoEl.addEventListener("loadedmetadata", () => {
       previewWidget.aspectRatio = previewWidget.videoEl.videoWidth / previewWidget.videoEl.videoHeight;
+      previewWidget.showStatus("");
       fitHeight(node);
     });
     previewWidget.videoEl.addEventListener("error", () => {
-      previewWidget.parentEl.hidden = true;
-      fitHeight(node);
+      const code = previewWidget.videoEl.error?.code || 0;
+      previewWidget.videoEl.hidden = true;
+      previewWidget.showStatus(t(
+        `无法播放此视频（错误 ${code}）。浏览器可能不支持视频编码，或本地临时地址已失效。请重新选择文件，或使用 H.264/AAC MP4。视频未上传。`,
+        `Cannot play this video (error ${code}). Its codec may be unsupported or the local URL has expired. Select the file again or use H.264/AAC MP4. No video was uploaded.`));
     });
     // The default is silent. Hovering plays the audio unless the context-menu
     // mute state is enabled, exactly like Video Combine V2.
@@ -101,11 +149,17 @@ function addVideoPreview(nodeType) {
       this.value.hidden = false;
       this.value.paused = false;
       this.parentEl.hidden = false;
+      this.showStatus(t("正在读取本地视频（不上传）…", "Reading local video (no upload)…"));
       this.videoEl.src = this.localBlobUrl;
       this.videoEl.hidden = false;
       this.videoEl.muted = true;
       this.videoEl.autoplay = true;
-      this.videoEl.play().catch(() => {});
+      const source = this.localBlobUrl;
+      this.videoEl.play().catch((error) => {
+        if (this.videoEl.src !== source || error.name === "AbortError" || this.videoEl.error) return;
+        this.showStatus(t(`播放未开始：${error.name}。请通过右键菜单继续预览。`, `Playback did not start: ${error.name}. Use Resume preview in the context menu.`));
+        this.value.paused = true;
+      });
       node.__feihouPreviewSource = "local";
       fitHeight(node);
     };
@@ -275,6 +329,7 @@ function localizeNode(node) {
 
 app.registerExtension({
   name: "FeiHou.VideoPreview",
+  setup() { installLocalVideoDrop(); },
   beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData?.name !== NODE_NAME) return;
     chainCallback(nodeType.prototype, "onNodeCreated", function () { localizeNode(this); });

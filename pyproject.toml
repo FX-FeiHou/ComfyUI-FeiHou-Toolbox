@@ -1,6 +1,6 @@
 [project]
 name = "feihou-toolbox"
-version = "2.10.1"
+version = "2.10.3"
 description = "FeiHou Toolbox: API image/video generation, standalone multimodal media loading, reference-image, mask, seed-noise, and one-file VHS video saving tools."
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

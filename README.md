@@ -13,7 +13,7 @@ The media socket also accepts native IMAGE batches, VIDEO or AUDIO; use the Medi
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.10.1**.
+Current version: **v2.10.3**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -107,6 +107,15 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.10.3
+
+- Restored the missing `frame_rate` widget when older `Video Combine 🎥🅥🅗🅢 V2` workflows are loaded by newer ComfyUI frontends.
+- Preserved the saved frame-rate value from both named and legacy positional widget data.
+
+### v2.10.2
+
+- Local video drops onto FeiHou-Video Preview now open a browser-only blob preview instead of importing embedded workflow metadata. No upload is performed. Drops outside the node retain ComfyUI's normal behavior; local media must be selected again after reloading the page.
 
 ### v2.10.1
 

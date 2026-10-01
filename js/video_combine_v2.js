@@ -132,6 +132,52 @@ function createVhsNumberWidget(node, inputName, inputData, integer) {
   return widget;
 }
 
+// Newer ComfyUI frontends migrate optional socketless inputs when a workflow
+// is configured.  Older Video Combine V2 workflows can therefore arrive with
+// the frame_rate widget omitted even though object_info still declares it.
+// Restore it by name before the node is serialized again.  This is deliberately
+// frontend-only: the backend default remains 8 fps and connected inputs still
+// take precedence during execution.
+function savedFrameRate(info) {
+  const values = info?.widgets_values;
+  if (!values) return undefined;
+  if (!Array.isArray(values)) return values.frame_rate;
+  const index = convDict[NODE_NAME]?.indexOf("frame_rate") ?? -1;
+  return index >= 0 && index < values.length ? values[index] : undefined;
+}
+
+function ensureFrameRateWidget(node, info) {
+  if (!node || node.type !== NODE_NAME || node.widgets?.some((widget) => widget.name === "frame_rate")) return;
+
+  const nodeData = LiteGraph.getNodeType(node.type)?.nodeData;
+  const source = nodeData?.input?.optional?.frame_rate?.[1] ?? {
+    default: 8,
+    min: 1,
+    step: 1,
+    socketless: true,
+  };
+  const widget = createVhsNumberWidget(node, "frame_rate", ["VHSFLOAT", {
+    ...source,
+    widgetType: "VHSFLOAT",
+  }], false);
+  const value = savedFrameRate(info);
+  if (value !== undefined && value !== null) widget.callback(value);
+
+  // Keep the original VHS order: frame_rate immediately precedes loop_count.
+  const appendedIndex = node.widgets.indexOf(widget);
+  const loopIndex = node.widgets.findIndex((item) => item.name === "loop_count");
+  const fallbackIndex = node.widgets.findIndex((item) => item.name === "filename_prefix");
+  const targetIndex = loopIndex >= 0 ? loopIndex : (fallbackIndex >= 0 ? fallbackIndex : 0);
+  if (appendedIndex !== targetIndex) {
+    node.widgets.splice(appendedIndex, 1);
+    node.widgets.splice(targetIndex, 0, widget);
+  }
+  const input = node.inputs?.find((item) => item.name === "frame_rate");
+  if (input && !input.widget) input.widget = { name: "frame_rate" };
+  node.setDirtyCanvas?.(true, true);
+  fitHeight(node);
+}
+
 function useKVState(nodeType) {
   chainCallback(nodeType.prototype, "onNodeCreated", function () {
     chainCallback(this, "onConfigure", function (info) {
@@ -525,6 +571,14 @@ app.registerExtension({
     if (nodeData?.name !== NODE_NAME) return;
     useKVState(nodeType);
     useVhsNodeBehavior(nodeType, nodeData);
+    // Run after the normal configure callbacks so a missing legacy widget is
+    // repaired before the workflow is displayed or saved again.
+    chainCallback(nodeType.prototype, "onNodeCreated", function () {
+      ensureFrameRateWidget(this);
+      chainCallback(this, "onConfigure", function (info) {
+        ensureFrameRateWidget(this, info);
+      });
+    });
     addDateFormatting(nodeType, "filename_prefix");
     chainCallback(nodeType.prototype, "onExecuted", function (message) {
       if (message?.gifs) this.updateParameters(message.gifs[0], true);

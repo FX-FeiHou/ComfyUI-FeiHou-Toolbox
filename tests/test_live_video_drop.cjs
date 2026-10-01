@@ -1,0 +1,22 @@
+const {chromium,firefox}=require('playwright');
+const fs=require('fs'),path=require('path');
+(async()=>{const browser=await (process.env.FH_TEST_FIREFOX ? firefox.launch({headless:true}) : chromium.launch({channel:'msedge',headless:true}));try{
+ const page=await browser.newPage({viewport:{width:1400,height:1000}});const errors=[];
+ page.setDefaultTimeout(20000);
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/*',r=>{if(!['GET','HEAD','OPTIONS'].includes(r.request().method()))return r.fulfill({status:403,body:'No mutation'});if(new URL(r.request().url()).pathname.endsWith('/video_preview.js'))return r.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(__dirname,'../js/video_preview.js'),'utf8')});return r.continue();});
+ await page.goto('http://127.0.0.1:8188');console.log('Page loaded');await page.waitForFunction(()=>globalThis.LiteGraph?.registered_node_types?.FeiHouVideoPreview).catch(e=>{console.log(errors);throw e;});await page.waitForTimeout(2500);
+ await page.evaluate(async()=>{const {app}=await import('/scripts/app.js');app.graph.clear();const n=LiteGraph.createNode('FeiHouVideoPreview');app.graph.add(n);n.pos=[100,180];app.canvas.ds.scale=1;app.canvas.ds.offset=[0,0];app.canvas.draw(true,true);globalThis.dropTest={app,n};});
+ await page.waitForTimeout(400);
+ const data=fs.readFileSync(process.env.FH_TEST_VIDEO || 'F:/Ai/ComfyUI-aki-v3.2/ComfyUI/input/20260813_211103_Minimax_H3_00001-audio.mp4').toString('base64');
+ const immediate=await page.evaluate(data=>{const {app,n}=dropTest;const dt=new DataTransfer();dt.items.add(new File([Uint8Array.from(atob(data),x=>x.charCodeAt(0))],'fixture.mp4',{type:'video/mp4'}));const box=app.canvas.canvas.getBoundingClientRect();const e=new DragEvent('drop',{bubbles:true,cancelable:true,clientX:box.left+160,clientY:box.top+210,dataTransfer:dt});app.canvas.canvas.dispatchEvent(e);return {prevented:e.defaultPrevented,widgets:n.widgets.map(w=>({name:w.name,local:typeof w.showLocalFile})),count:app.graph._nodes.length};},data);
+ await page.waitForTimeout(1500);
+ const result=await page.evaluate(()=>{const w=dropTest.n.widgets.find(w=>w.name==='videopreview'),v=w.videoEl;return {src:v.src.slice(0,30),paused:v.paused,time:v.currentTime,width:v.videoWidth,error:v.error?.message,hidden:w.parentEl.hidden,rect:v.getBoundingClientRect().toJSON(),size:dropTest.n.size};});
+ console.log(JSON.stringify({immediate,result,errors}));
+ if(!result.width||result.paused||result.rect.height<10)throw Error('Preview not playing visibly');
+ await page.evaluate(()=>dropTest.n.widgets.find(w=>w.name==='videopreview').showLocalFile(new File(['invalid'],'broken.mp4',{type:'video/mp4'})));
+ await page.waitForFunction(()=>dropTest.n.widgets.find(w=>w.name==='videopreview').videoEl.error);
+ const failure=await page.evaluate(()=>{const w=dropTest.n.widgets.find(w=>w.name==='videopreview');return {message:w.statusEl.textContent,visible:!w.parentEl.hidden&&w.statusEl.getBoundingClientRect().height>0};});
+ if(!failure.visible||!failure.message)throw Error('Playback error hidden');
+ console.log('PASS: real MP4 plays; invalid video shows visible error without importing workflow');
+ }finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});
