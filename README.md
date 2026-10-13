@@ -13,7 +13,7 @@ The media socket also accepts native IMAGE batches, VIDEO or AUDIO; use the Medi
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.10.3**.
+Current version: **v2.10.4**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -107,6 +107,12 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.10.4
+
+- `Video Combine 🎥🅥🅗🅢 V2` has a new optional `latent` input. When connected, a `.latent` file with the same name is saved next to the video (ComfyUI Save Latent layout; video and audio latents in one file).
+- Connected to the `tail_latent` of FeiHou Easy H3 "接续合并", every segment is recorded in a per-pack manifest; after the last segment the saved segment videos are joined losslessly (ffmpeg concat, no re-encode) into `<last file>_完整.mp4` in the same folder.
+- Nothing changes when `latent` is not connected.
 
 ### v2.10.3
 
