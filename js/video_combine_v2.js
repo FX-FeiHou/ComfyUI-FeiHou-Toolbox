@@ -147,33 +147,49 @@ function savedFrameRate(info) {
 }
 
 function ensureFrameRateWidget(node, info) {
-  if (!node || node.type !== NODE_NAME || node.widgets?.some((widget) => widget.name === "frame_rate")) return;
+  if (!node || node.type !== NODE_NAME) return;
 
   const nodeData = LiteGraph.getNodeType(node.type)?.nodeData;
   const source = nodeData?.input?.optional?.frame_rate?.[1] ?? {
     default: 8,
     min: 1,
     step: 1,
-    socketless: true,
+    socketless: false,
   };
-  const widget = createVhsNumberWidget(node, "frame_rate", ["VHSFLOAT", {
+  const config = ["FLOAT", {
     ...source,
+    socketless: false,
     widgetType: "VHSFLOAT",
-  }], false);
-  const value = savedFrameRate(info);
-  if (value !== undefined && value !== null) widget.callback(value);
+  }];
+  let widget = node.widgets?.find((item) => item.name === "frame_rate");
+  if (!widget) {
+    widget = createVhsNumberWidget(node, "frame_rate", config, false);
+    const value = savedFrameRate(info);
+    if (value !== undefined && value !== null) widget.callback(value);
 
-  // Keep the original VHS order: frame_rate immediately precedes loop_count.
-  const appendedIndex = node.widgets.indexOf(widget);
-  const loopIndex = node.widgets.findIndex((item) => item.name === "loop_count");
-  const fallbackIndex = node.widgets.findIndex((item) => item.name === "filename_prefix");
-  const targetIndex = loopIndex >= 0 ? loopIndex : (fallbackIndex >= 0 ? fallbackIndex : 0);
-  if (appendedIndex !== targetIndex) {
-    node.widgets.splice(appendedIndex, 1);
-    node.widgets.splice(targetIndex, 0, widget);
+    // Only insert a missing widget; do not reorder existing converted widgets.
+    const appendedIndex = node.widgets.indexOf(widget);
+    const loopIndex = node.widgets.findIndex((item) => item.name === "loop_count");
+    const fallbackIndex = node.widgets.findIndex((item) => item.name === "filename_prefix");
+    const targetIndex = loopIndex >= 0 ? loopIndex : (fallbackIndex >= 0 ? fallbackIndex : 0);
+    if (appendedIndex !== targetIndex) {
+      node.widgets.splice(appendedIndex, 1);
+      node.widgets.splice(targetIndex, 0, widget);
+    }
   }
-  const input = node.inputs?.find((item) => item.name === "frame_rate");
-  if (input && !input.widget) input.widget = { name: "frame_rate" };
+  widget.config = config;
+  widget.options ??= {};
+  widget.options.socketless = false;
+  // Old workflows store input slots and links by index. Keep every existing
+  // slot in place and append only if an older socketless workflow has no FPS
+  // input at all. Never remove/reinsert a linked input.
+  let input = node.inputs?.find((item) => item.name === "frame_rate");
+  if (!input) input = node.addInput("frame_rate", "FLOAT,INT", { widget: { name: "frame_rate" } });
+  if (input) {
+    input.type = "FLOAT,INT";
+    input.widget ??= { name: "frame_rate" };
+    setWidgetConfig(input, config);
+  }
   node.setDirtyCanvas?.(true, true);
   fitHeight(node);
 }
@@ -235,6 +251,13 @@ function useVhsNodeBehavior(nodeType, nodeData) {
   // This is the node-specific portion of VHS.core.js' shared VHS setup.  It
   // keeps the original Video Combine numeric widgets and dynamic-widget input
   // configuration instead of substituting ComfyUI defaults.
+  // Also normalize cached pre-v2.10.5 schemas so the upgraded frontend can
+  // show a widget AND a socket before the user's backend has restarted.
+  const frameRate = nodeData.input?.optional?.frame_rate ?? nodeData.input?.required?.frame_rate;
+  if (frameRate) {
+    frameRate[1] ??= {};
+    frameRate[1].socketless = false;
+  }
   for (const input of Object.values({ ...nodeData.input?.required, ...nodeData.input?.optional })) {
     if (["INT", "FLOAT"].includes(input[0])) {
       input[1] ??= {};

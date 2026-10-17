@@ -166,7 +166,7 @@ class VideoCombineV2(io.ComfyNode):
                 # numeric widgets.  These must therefore be optional inputs
                 # with Python defaults: a missing widget value is never a
                 # validation error, while a linked value still overrides it.
-                io.Float.Input("frame_rate", default=8.0, min=1.0, step=1.0, optional=True, socketless=True),
+                io.Float.Input("frame_rate", default=8.0, min=1.0, step=1.0, optional=True, socketless=False),
                 io.Int.Input("loop_count", default=0, min=0, max=100, step=1, optional=True, socketless=True),
                 io.String.Input("filename_prefix", default="AnimateDiff", optional=True, socketless=True),
                 io.Combo.Input("format", options=["image/gif", "image/webp"] + ffmpeg_formats,

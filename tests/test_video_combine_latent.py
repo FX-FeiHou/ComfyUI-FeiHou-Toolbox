@@ -34,6 +34,13 @@ if "--cpu" in sys.argv:
 
 
 class LatentSaveTests(unittest.TestCase):
+    def test_frame_rate_schema_keeps_widget_and_socket(self):
+        schema = video.VideoCombineV2.define_schema()
+        fps = next(item for item in schema.inputs if item.id == "frame_rate")
+        self.assertFalse(fps.socketless)
+        self.assertTrue(fps.optional)
+        self.assertEqual(fps.default, 8.0)
+
     def test_tensor_and_metadata_roundtrip(self):
         samples = torch.arange(8, dtype=torch.float32).reshape(1, 2, 2, 2)
         audio = torch.ones(1, 2, 3)
