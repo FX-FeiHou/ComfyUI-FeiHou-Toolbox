@@ -339,16 +339,16 @@ function addCustomWidget(node, widget) {
 
 function removeOldUiWidgets(node) {
   if (!Array.isArray(node.widgets)) return;
-  for (let index = node.widgets.length - 1; index >= 0; index--) {
-    const widget = node.widgets[index];
+  for (const widget of [...node.widgets]) {
     if (
       widget?.name === "fh_fast_groups_bypass_switch" ||
       widget?.name === "fast_groups_bypass_switch" ||
       widget?.name === "fh_group_1" ||
       widget?.name === "fh_group_2"
     ) {
-      if (typeof node.removeWidget === "function") node.removeWidget(index);
-      else node.widgets.splice(index, 1);
+      if (typeof node.removeWidget === "function") node.removeWidget(widget);
+      const index = node.widgets.indexOf(widget);
+      if (index !== -1) node.widgets.splice(index, 1);
     }
   }
 }
