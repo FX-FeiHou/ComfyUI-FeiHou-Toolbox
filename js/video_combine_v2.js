@@ -27,7 +27,11 @@ const convDict = {
 
 // The original node gets these from VideoHelperSuite's VHS.core.js.  V2 must
 // provide them too: otherwise an installation without VideoHelperSuite turns
-// VHSFLOAT/VHSINT into required sockets, including loop_count.
+// VHSFLOAT/VHSINT into required sockets, including loop_count.  They are
+// registered under FeiHou-only names: custom widget names are global, so
+// reusing VHSFLOAT/VHSINT would replace VideoHelperSuite's own widgets on
+// every VHS node (Load Video, Video Combine, ...) whenever this file loads last.
+const WIDGET_PREFIX = "FEIHOU_VHS";
 function roundVhsNumber(value, precision) {
   const fixed = Number(value).toFixed(precision);
   const dot = fixed.indexOf(".");
@@ -159,7 +163,7 @@ function ensureFrameRateWidget(node, info) {
   const config = ["FLOAT", {
     ...source,
     socketless: false,
-    widgetType: "VHSFLOAT",
+    widgetType: `${WIDGET_PREFIX}FLOAT`,
   }];
   let widget = node.widgets?.find((item) => item.name === "frame_rate");
   if (!widget) {
@@ -261,7 +265,7 @@ function useVhsNodeBehavior(nodeType, nodeData) {
   for (const input of Object.values({ ...nodeData.input?.required, ...nodeData.input?.optional })) {
     if (["INT", "FLOAT"].includes(input[0])) {
       input[1] ??= {};
-      input[1].widgetType ??= `VHS${input[0]}`;
+      input[1].widgetType ??= `${WIDGET_PREFIX}${input[0]}`;
     }
   }
   chainCallback(nodeType.prototype, "onNodeCreated", function () {
@@ -582,10 +586,10 @@ app.registerExtension({
   name: "FeiHou.VideoCombineV2",
   getCustomWidgets() {
     return {
-      VHSFLOAT(node, inputName, inputData) {
+      [`${WIDGET_PREFIX}FLOAT`](node, inputName, inputData) {
         return createVhsNumberWidget(node, inputName, inputData, false);
       },
-      VHSINT(node, inputName, inputData) {
+      [`${WIDGET_PREFIX}INT`](node, inputName, inputData) {
         return createVhsNumberWidget(node, inputName, inputData, true);
       },
     };

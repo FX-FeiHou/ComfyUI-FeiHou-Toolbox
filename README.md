@@ -13,7 +13,7 @@ The media socket also accepts native IMAGE batches, VIDEO or AUDIO; use the Medi
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.10.6**.
+Current version: **v2.10.7**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -107,6 +107,12 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.10.7
+
+- Fixed `Video Combine 🎥🅥🅗🅢 V2` ignoring per-format options such as `crf` and `pix_fmt`: they now reach the encoder, so changing `crf` changes the compression. Requires a ComfyUI from January 2026 or later; older versions log a warning and keep the format defaults.
+- Fixed a conflict with VideoHelperSuite: V2's numeric widgets were registered under VHS's own `VHSFLOAT`/`VHSINT` names and could replace the widgets on every VHS node. They now use FeiHou-only names.
+- V2 connected to VHS Meta Batch Manager now queues the following batches.
 
 ### v2.10.6
 

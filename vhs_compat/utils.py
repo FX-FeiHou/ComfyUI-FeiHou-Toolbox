@@ -211,7 +211,7 @@ def requeue_workflow(requeue_required=(-1,True)):
         for bm_uid in prompt:
             if prompt[bm_uid]['class_type'] == 'VHS_BatchManager':
                 for output_uid in prompt:
-                    if prompt[output_uid]['class_type'] in ["VHS_VideoCombine"]:
+                    if prompt[output_uid]['class_type'] in ["VHS_VideoCombine", "VideoCombineV2"]:
                         for inp in prompt[output_uid]['inputs'].values():
                             if inp == [bm_uid, 0]:
                                 managed_outputs+=1

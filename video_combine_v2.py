@@ -27,6 +27,14 @@ LOGGER = logging.getLogger(__name__)
 # extra tensors/metadata for the .latent file plus the series manifest used to
 # continue from a saved segment and to join the finished segments.
 SERIES_KEY = "feihou_save"
+# Per-format widgets (crf, pix_fmt, ...) are added by the frontend and are not
+# schema inputs.  The original VHS node receives them through a ContainsAll
+# hidden dict; a V3 node only receives them with accept_all_inputs, otherwise
+# ComfyUI drops them and VHS silently encodes with the format defaults.
+_SCHEMA_EXTRA = {"accept_all_inputs": True} if "accept_all_inputs" in getattr(io.Schema, "__dataclass_fields__", {}) else {}
+if not _SCHEMA_EXTRA:
+    LOGGER.warning("Video Combine V2: this ComfyUI is too old to pass format options (crf, pix_fmt, ...); "
+                   "update ComfyUI or they stay at their defaults.")
 
 
 def _ffmpeg_path():
@@ -180,6 +188,7 @@ class VideoCombineV2(io.ComfyNode):
             outputs=[VHSFilenames.Output("Filenames")],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo, io.Hidden.unique_id],
             is_output_node=True,
+            **_SCHEMA_EXTRA,
         )
 
     @staticmethod

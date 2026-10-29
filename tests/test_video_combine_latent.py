@@ -41,6 +41,14 @@ class LatentSaveTests(unittest.TestCase):
         self.assertTrue(fps.optional)
         self.assertEqual(fps.default, 8.0)
 
+    def test_format_widget_values_reach_execute(self):
+        # crf/pix_fmt are added by the frontend per format and are not in the schema.
+        import execution
+        inputs = {"frame_rate": 8.0, "format": "video/h264-mp4", "crf": 33, "pix_fmt": "yuv420p10le"}
+        data = execution.get_input_data(inputs, video.VideoCombineV2, "1")[0]
+        self.assertEqual(data.get("crf"), [33])
+        self.assertEqual(data.get("pix_fmt"), ["yuv420p10le"])
+
     def test_tensor_and_metadata_roundtrip(self):
         samples = torch.arange(8, dtype=torch.float32).reshape(1, 2, 2, 2)
         audio = torch.ones(1, 2, 3)
