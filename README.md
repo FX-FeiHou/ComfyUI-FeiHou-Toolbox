@@ -13,7 +13,7 @@ The media socket also accepts native IMAGE batches, VIDEO or AUDIO; use the Medi
 
 A ComfyUI custom node toolbox focused on multi-image references, SAM3/SAM3.1 person cutouts, SCAIL-2 mask workflows, image batch utilities, boolean routing, and group-based workflow switching.
 
-Current version: **v2.10.7**.
+Current version: **v2.10.8**.
 The latest version of **ManualRefCollage** is **v2.2.2**.
 
 <p align="right">
@@ -107,6 +107,12 @@ A group bypass and switch node that binds two ComfyUI Groups, switches which gro
 ---
 
 ## Changelog
+
+### v2.10.8
+
+- Added title board display: gradient titles made with the NB-ComfyUI launcher now show correctly with only this toolbox installed. Display only; when the launcher is installed, it keeps handling them.
+- Fixed the `FeiHou.NodeTitleLocalization` error on newer ComfyUI frontends. Localized titles now apply again when nodes are created.
+- Added the `FeiHou_API_Image_example.json` and `FeiHou_API_Video_example.json` example workflows.
 
 ### v2.10.7
 

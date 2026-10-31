@@ -73,7 +73,6 @@ app.registerExtension({
 
     nodeData.display_name = title;
     nodeType.title = title;
-    nodeType.prototype.title = title;
 
     nodeType.prototype.onNodeCreated = function () {
       const result = onNodeCreated?.apply(this, arguments);

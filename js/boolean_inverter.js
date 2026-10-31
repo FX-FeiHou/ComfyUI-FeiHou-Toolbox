@@ -38,7 +38,6 @@ app.registerExtension({
     const onConfigure = nodeType.prototype.onConfigure;
 
     nodeType.title = title;
-    nodeType.prototype.title = title;
 
     nodeType.prototype.onNodeCreated = function () {
       const result = onNodeCreated?.apply(this, arguments);

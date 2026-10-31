@@ -1,0 +1,110 @@
+{
+  "last_node_id": 2,
+  "last_link_id": 1,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "FeiHouApiVideo",
+      "pos": [
+        560,
+        120
+      ],
+      "size": [
+        430,
+        470
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "media",
+          "type": "*",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": null,
+          "slot_index": 0
+        },
+        {
+          "name": "video_url",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "last_frame",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FeiHouApiVideo"
+      },
+      "widgets_values": [
+        "",
+        "seedance-2.0-fast-t2v",
+        "一只金色小猴子在云端奔跑，镜头缓慢推进，电影感光线",
+        "720p",
+        "16:9",
+        "5",
+        -1,
+        "on",
+        false,
+        "[]"
+      ],
+      "title": "FeiHou-API Video"
+    },
+    {
+      "id": 2,
+      "type": "FeiHouApiMediaLoader",
+      "pos": [
+        70,
+        120
+      ],
+      "size": [
+        430,
+        520
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "media",
+          "type": "FEIHOU_API_MEDIA",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FeiHouApiMediaLoader"
+      },
+      "widgets_values": [
+        "[]"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      1,
+      0,
+      "FEIHOU_API_MEDIA"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
